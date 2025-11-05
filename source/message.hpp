@@ -250,4 +250,144 @@ namespace rpc
             _body[KEY_HOST] = val;
         }
     };
+
+
+
+    class RpcResponse : public JsonResponse
+    {
+    public:
+        using ptr = std::shared_ptr<RpcResponse>;
+
+        virtual bool check() override
+        {
+            if (_body[KEY_RCODE].isNull() == true || _body[KEY_RCODE].isIntegral() == false)
+            {
+                ELOG("RPC响应中没有响应状态码或者响应状态码类型错误！");
+                return false;
+            }
+
+            if (_body[KEY_RESULT].isNull() == true || _body[KEY_RESULT].isObject() == false)
+            {
+                ELOG("RPC响应中没有调用结果或者返回结果类型错误！");
+                return false;
+            }
+
+            return true;
+        }
+
+        RCode rcode()
+        {
+            return (RCode)_body[KEY_RCODE].asInt();
+        }
+
+        void setRcode(RCode rcode)
+        {
+            _body[KEY_RCODE] = (int)rcode;
+        }
+
+        Json::Value result()
+        {
+            return _body[KEY_RESULT];
+        }
+
+        void setResult(const Json::Value &result)
+        {
+            _body[KEY_RESULT] = result;
+        }
+    };
+
+    class TopicResponse : public JsonResponse
+    {
+    public:
+        using ptr = std::shared_ptr<TopicResponse>;
+
+        RCode rcode()
+        {
+            return (RCode)_body[KEY_RCODE].asInt();
+        }
+
+        void setRcode(RCode rcode)
+        {
+            _body[KEY_RCODE] = (int)rcode;
+        }
+    };
+
+    class ServiceResponse : public JsonResponse
+    {
+    public:
+        using ptr = std::shared_ptr<ServiceResponse>;
+
+        virtual bool check() override
+        {
+            if (_body[KEY_RCODE].isNull() == true || _body[KEY_RCODE].isIntegral() == false)
+            {
+                ELOG("RPC响应中没有响应状态码或者响应状态码类型错误！");
+                return false;
+            }
+
+            if (_body[KEY_OPTYPE].isNull() == true || _body[KEY_OPTYPE].isIntegral() == false)
+            {
+                ELOG("响应中没有操作类型或者操作类型类型错误！");
+                return false;
+            }
+
+            if (_body[KEY_OPTYPE].asInt() == (int)ServiceOptype::SERVICE_REGISTRY &&
+                _body[KEY_METHOD].isNull() == true ||
+                _body[KEY_METHOD].isString() == false ||
+                _body[KEY_HOST].isNull() == true ||
+                _body[KEY_HOST].isArray() == false)
+            {
+                ELOG("服务发现响应中响应信息字段错误！");
+                return false;
+            }
+
+            return true;
+        }
+
+        RCode rcode()
+        {
+            return (RCode)_body[KEY_RCODE].asInt();
+        }
+
+        void setRcode(RCode rcode)
+        {
+            _body[KEY_RCODE] = (int)rcode;
+        }
+
+        std::string method()
+        {
+            return _body[KEY_METHOD].asString();
+        }
+
+        void setMethod(const std::string &method)
+        {
+            _body[KEY_METHOD] = method;
+        }
+
+        void setHost(std::vector<Address> addrs)
+        {
+            for (auto &addr : addrs)
+            {
+                Json::Value val;
+                val[KEY_HOST_IP] = addr.first;
+                val[KEY_HOST_PORT] = addr.second;
+                _body[KEY_HOST].append(val);
+            }
+        }
+
+        std::vector<Address> Hosts()
+        {
+            std::vector<Address> addrs;
+            int sz = _body[KEY_HOST].size();
+            for (int i = 0; i < sz; i++)
+            {
+                Address addr;
+                addr.first = _body[KEY_HOST][i][KEY_HOST_IP].asString();
+                addr.second = _body[KEY_HOST][i][KEY_HOST_PORT].asInt();
+                addrs.push_back(addr);
+            }
+
+            return addrs;
+        }
+    };
 }
