@@ -186,11 +186,6 @@ namespace rpc
         }
     };
 
-    class ServiceRequest : public JsonRequest
-    {
-    public:
-        using ptr = std::shared_ptr<ServiceRequest>;
-    };
 
     class ServiceRequest : public JsonRequest
     {
@@ -241,7 +236,7 @@ namespace rpc
             return (ServiceOptype)_body[KEY_OPTYPE].asInt();
         }
 
-        void setOptype(TopicOptype optype)
+        void setOptype(ServiceOptype optype)
         {
             _body[KEY_OPTYPE] = (int)optype;
         }
@@ -400,7 +395,7 @@ namespace rpc
         }
 
         template<typename T, typename... Args>
-        static BaseMessage::ptr create(Args&&... args)
+        static std::shared_ptr<T> create(Args&&... args)
         {
             return std::make_shared<T>(std::forward<Args>(args)...);
         }
