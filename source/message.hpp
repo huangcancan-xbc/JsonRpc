@@ -30,11 +30,6 @@ namespace rpc
             return JSON::unserialize(msg, _body);
         }
 
-        // virtual bool check() override
-        // {
-
-        // }
-
     protected:
         Json::Value _body;
     };
@@ -74,7 +69,7 @@ namespace rpc
             return (RCode)_body[KEY_RCODE].asInt();
         }
 
-        virtual void setRcode(RCode rcode)
+        virtual void setRCode(RCode rcode)
         {
             _body[KEY_RCODE] = (int)rcode;
         }
@@ -208,11 +203,11 @@ namespace rpc
 
             if (_body[KEY_OPTYPE].asInt() != (int)ServiceOptype::SERVICE_DISCOVERY &&
                 (_body[KEY_HOST].isNull() == true ||
-                _body[KEY_HOST].isObject() == false ||
-                _body[KEY_HOST_IP].isNull() == true ||
-                _body[KEY_HOST_IP].isString() == false ||
-                _body[KEY_HOST_PORT].isNull() == true ||
-                _body[KEY_HOST_PORT].isIntegral() == false))
+                 _body[KEY_HOST].isObject() == false ||
+                 _body[KEY_HOST][KEY_HOST_IP].isNull() == true ||
+                 _body[KEY_HOST][KEY_HOST_IP].isString() == false ||
+                 _body[KEY_HOST][KEY_HOST_PORT].isNull() == true ||
+                 _body[KEY_HOST][KEY_HOST_PORT].isIntegral() == false))
             {
                 ELOG("服务请求中主机地址信息错误！");
                 return false;
@@ -273,7 +268,7 @@ namespace rpc
                 return false;
             }
 
-            if (_body[KEY_RESULT].isNull() == true || _body[KEY_RESULT].isObject() == false)
+            if (_body[KEY_RESULT].isNull() == true)
             {
                 ELOG("RPC响应中没有调用结果或者返回结果类型错误！");
                 return false;
@@ -337,6 +332,11 @@ namespace rpc
             return (ServiceOptype)_body[KEY_OPTYPE].asInt();
         }
 
+        void setOptype(ServiceOptype optype)
+        {
+            _body[KEY_OPTYPE] = (int)optype;
+        }
+
         std::string method()
         {
             return _body[KEY_METHOD].asString();
@@ -358,7 +358,7 @@ namespace rpc
             }
         }
 
-        std::vector<Address> Hosts()
+        std::vector<Address> hosts()
         {
             std::vector<Address> addrs;
             int sz = _body[KEY_HOST].size();

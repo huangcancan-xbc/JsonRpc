@@ -157,41 +157,253 @@
 
 
 
-#include "message.hpp"
 
+
+// #include "message.hpp"
+// int main()
+// {
+//     // rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::REQ_RPC);
+//     // rpc::RpcRequest::ptr rrp =std::dynamic_pointer_cast<rpc::RpcRequest>(bmp);
+
+//     rpc::RpcRequest::ptr rrp=rpc::MessageFactory::create<rpc::RpcRequest>();
+//     Json::Value param;
+//     param["num1"] = 11;
+//     param["num2"] = 22;
+
+//     rrp->setMethod("Add");
+//     rrp->setParams(param);
+
+//     std::string str=rrp->serialize();
+//     std::cout << str << std::endl;
+
+//     rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::REQ_RPC);
+//     bool ret=bmp->unserialize(str);
+//     if(ret==false)
+//     {
+//         return -1;
+//     }
+
+//     ret = bmp->check();
+//     if(ret==false)
+//     {
+//         return -1;
+//     }
+
+//     rpc::RpcRequest::ptr rrp2=std::dynamic_pointer_cast<rpc::RpcRequest>(bmp);
+//     std::cout << rrp2->method() << std::endl;
+//     std::cout << rrp2->params()["num1"].asInt() << std::endl;
+//     std::cout << rrp2->params()["num2"].asInt() << std::endl;
+
+//     return 0;
+// }
+
+
+
+
+
+// #include "message.hpp"
+// int main()
+// {
+//     rpc::TopicRequest::ptr trp=rpc::MessageFactory::create<rpc::TopicRequest>();
+//     trp->setTopicKey("news");
+//     trp->setOptype(rpc::TopicOptype::TOPIC_PUBLISH);
+//     trp->setTopicMsg("hello, world!");
+//     std::string str=trp->serialize();
+//     std::cout << str << std::endl;
+
+//     rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::REQ_TOPIC);
+//     bool ret=bmp->unserialize(str);
+//     if(ret==false)
+//     {
+//         return -1;
+//     }
+//     ret = bmp->check();
+//     if(ret==false)
+//     {
+//         return -1;
+//     }
+
+//     rpc::TopicRequest::ptr trp2=std::dynamic_pointer_cast<rpc::TopicRequest>(bmp);
+//     std::cout << trp2->topicKey() << std::endl;
+//     std::cout << (int)trp2->optype() << std::endl;
+//     std::cout << trp2->topicMsg() << std::endl;
+
+//     return 0;
+// }
+
+
+
+
+
+// #include "message.hpp"
+// int main()
+// {
+//     rpc::ServiceRequest::ptr trp = rpc::MessageFactory::create<rpc::ServiceRequest>();
+//     trp->setMethod("Add");
+//     trp->setOptype(rpc::ServiceOptype::SERVICE_DISCOVERY);
+//     std::string str = trp->serialize();
+//     std::cout << str << std::endl;
+
+//     rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::REQ_SERVICE);
+//     bool ret = bmp->unserialize(str);
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+//     ret = bmp->check();
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+
+//     rpc::ServiceRequest::ptr trp2 = std::dynamic_pointer_cast<rpc::ServiceRequest>(bmp);
+//     std::cout << trp2->method() << std::endl;
+//     std::cout << (int)trp2->optype() << std::endl;
+
+//     return 0;
+// }
+
+
+
+
+
+// #include "message.hpp"
+// int main()
+// {
+//     rpc::ServiceRequest::ptr trp = rpc::MessageFactory::create<rpc::ServiceRequest>();
+//     trp->setMethod("Add");
+//     trp->setOptype(rpc::ServiceOptype::SERVICE_DISCOVERY);
+//     trp->setHost(rpc::Address("127.0.0.1", 8080));
+//     std::string str = trp->serialize();
+//     std::cout << str << std::endl;
+
+//     rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::REQ_SERVICE);
+//     bool ret = bmp->unserialize(str);
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+//     ret = bmp->check();
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+
+//     rpc::ServiceRequest::ptr trp2 = std::dynamic_pointer_cast<rpc::ServiceRequest>(bmp);
+//     std::cout << trp2->method() << std::endl;
+//     std::cout << (int)trp2->optype() << std::endl;
+//     std::cout << trp2->host().first << std::endl;
+//     std::cout << trp2->host().second << std::endl;
+
+//     return 0;
+// }
+
+
+
+
+
+// #include "message.hpp"
+// int main()
+// {
+//     rpc::RpcResponse::ptr trp = rpc::MessageFactory::create<rpc::RpcResponse>();
+//     trp->setRCode(rpc::RCode::RCODE_OK);
+//     // Json::Value val;
+//     // val = 33;
+//     // trp->setResult(val);
+//     trp->setResult(33);
+//     std::string str = trp->serialize();
+//     std::cout << str << std::endl;
+
+//     rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::RSP_RPC);
+//     bool ret = bmp->unserialize(str);
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+//     ret = bmp->check();
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+
+//     rpc::RpcResponse::ptr trp2 = std::dynamic_pointer_cast<rpc::RpcResponse>(bmp);
+//     std::cout << (int)trp2->rcode()<< std::endl;
+//     std::cout << trp2->result().asInt() << std::endl;
+
+//     return 0;
+// }
+
+
+
+
+
+// #include "message.hpp"
+// int main()
+// {
+//     rpc::TopicResponse::ptr trp = rpc::MessageFactory::create<rpc::TopicResponse>();
+//     trp->setRCode(rpc::RCode::RCODE_OK);
+//     std::string str = trp->serialize();
+//     std::cout << str << std::endl;
+
+//     rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::RSP_TOPIC);
+//     bool ret = bmp->unserialize(str);
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+//     ret = bmp->check();
+//     if (ret == false)
+//     {
+//         return -1;
+//     }
+
+//     rpc::TopicResponse::ptr trp2 = std::dynamic_pointer_cast<rpc::TopicResponse>(bmp);
+//     std::cout << (int)trp2->rcode() << std::endl;
+
+//     return 0;
+// }
+
+
+
+
+
+#include "message.hpp"
 int main()
 {
-    // rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::REQ_RPC);
-    // rpc::RpcRequest::ptr rrp =std::dynamic_pointer_cast<rpc::RpcRequest>(bmp);
-
-    rpc::RpcRequest::ptr rrp=rpc::MessageFactory::create<rpc::RpcRequest>();
-    Json::Value param;
-    param["num1"] = 11;
-    param["num2"] = 22;
-
-    rrp->setMethod("Add");
-    rrp->setParams(param);
-
-    std::string str=rrp->serialize();
+    rpc::ServiceResponse::ptr trp = rpc::MessageFactory::create<rpc::ServiceResponse>();
+    trp->setRCode(rpc::RCode::RCODE_OK);
+    trp->setMethod("Add");
+    trp->setOptype(rpc::ServiceOptype::SERVICE_DISCOVERY);
+    std::vector<rpc::Address> addrs;
+    addrs.push_back(rpc::Address("127.0.0.1", 8080));
+    addrs.push_back(rpc::Address("127.0.0.1", 8081));
+    trp->setHost(addrs);
+    std::string str = trp->serialize();
     std::cout << str << std::endl;
 
-    rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::REQ_RPC);
-    bool ret=bmp->unserialize(str);
-    if(ret==false)
+
+    rpc::BaseMessage::ptr bmp = rpc::MessageFactory::create(rpc::MType::RSP_SERVICE);
+    bool ret = bmp->unserialize(str);
+    if (ret == false)
     {
         return -1;
     }
-
     ret = bmp->check();
-    if(ret==false)
+    if (ret == false)
     {
         return -1;
     }
 
-    rpc::RpcRequest::ptr rrp2=std::dynamic_pointer_cast<rpc::RpcRequest>(bmp);
-    std::cout << rrp2->method() << std::endl;
-    std::cout << rrp2->params()["num1"].asInt() << std::endl;
-    std::cout << rrp2->params()["num2"].asInt() << std::endl;
+    rpc::ServiceResponse::ptr trp2 = std::dynamic_pointer_cast<rpc::ServiceResponse>(bmp);
+    std::cout << (int)trp2->rcode() << std::endl;
+    std::cout << (int)trp2->optype() << std::endl;
+    std::cout << trp2->method() << std::endl;
+    std::vector<rpc::Address> addrs1 = trp2->hosts();
+    for(auto &addr : addrs1)
+    {
+        std::cout << addr.first << ":" << addr.second << std::endl;
+    }
+    std::cout << trp2->hosts().size() << std::endl;
 
     return 0;
 }
