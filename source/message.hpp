@@ -6,6 +6,8 @@
 
 namespace rpc
 {
+    typedef std::pair<std::string, int> Address;
+
     class JsonMessage : public BaseMessage
     {
     public:
@@ -65,6 +67,16 @@ namespace rpc
             }
 
             return true;
+        }
+
+        virtual RCode rcode()
+        {
+            return (RCode)_body[KEY_RCODE].asInt();
+        }
+
+        virtual void setRcode(RCode rcode)
+        {
+            _body[KEY_RCODE] = (int)rcode;
         }
     };
 
@@ -180,7 +192,6 @@ namespace rpc
         using ptr = std::shared_ptr<ServiceRequest>;
     };
 
-    typedef std::pair<std::string, int> Address;
     class ServiceRequest : public JsonRequest
     {
     public:
@@ -200,12 +211,13 @@ namespace rpc
                 return false;
             }
 
-            if (_body[KEY_HOST].isNull() == true ||
+            if (_body[KEY_OPTYPE].asInt() != (int)ServiceOptype::SERVICE_DISCOVERY &&
+                (_body[KEY_HOST].isNull() == true ||
                 _body[KEY_HOST].isObject() == false ||
                 _body[KEY_HOST_IP].isNull() == true ||
                 _body[KEY_HOST_IP].isString() == false ||
                 _body[KEY_HOST_PORT].isNull() == true ||
-                _body[KEY_HOST_PORT].isIntegral() == false)
+                _body[KEY_HOST_PORT].isIntegral() == false))
             {
                 ELOG("服务请求中主机地址信息错误！");
                 return false;
@@ -275,16 +287,6 @@ namespace rpc
             return true;
         }
 
-        RCode rcode()
-        {
-            return (RCode)_body[KEY_RCODE].asInt();
-        }
-
-        void setRcode(RCode rcode)
-        {
-            _body[KEY_RCODE] = (int)rcode;
-        }
-
         Json::Value result()
         {
             return _body[KEY_RESULT];
@@ -301,15 +303,6 @@ namespace rpc
     public:
         using ptr = std::shared_ptr<TopicResponse>;
 
-        RCode rcode()
-        {
-            return (RCode)_body[KEY_RCODE].asInt();
-        }
-
-        void setRcode(RCode rcode)
-        {
-            _body[KEY_RCODE] = (int)rcode;
-        }
     };
 
     class ServiceResponse : public JsonResponse
@@ -344,14 +337,9 @@ namespace rpc
             return true;
         }
 
-        RCode rcode()
+        ServiceOptype optype()
         {
-            return (RCode)_body[KEY_RCODE].asInt();
-        }
-
-        void setRcode(RCode rcode)
-        {
-            _body[KEY_RCODE] = (int)rcode;
+            return (ServiceOptype)_body[KEY_OPTYPE].asInt();
         }
 
         std::string method()
@@ -388,6 +376,33 @@ namespace rpc
             }
 
             return addrs;
+        }
+    };
+
+
+    // 实现一个消息对象的生产工厂
+    class MessageFactory
+    {
+    public:
+        static BaseMessage::ptr create(MType mtype)
+        {
+            switch(mtype)
+            {
+                case MType::REQ_RPC : return std::make_shared<RpcRequest>();
+                case MType::RSP_RPC : return std::make_shared<RpcResponse>();
+                case MType::REQ_TOPIC : return std::make_shared<TopicRequest>();
+                case MType::RSP_TOPIC : return std::make_shared<TopicResponse>();
+                case MType::REQ_SERVICE : return std::make_shared<ServiceRequest>();
+                case MType::RSP_SERVICE : return std::make_shared<ServiceResponse>();
+            }
+
+            return BaseMessage::ptr();
+        }
+
+        template<typename T, typename... Args>
+        static BaseMessage::ptr create(Args&&... args)
+        {
+            return std::make_shared<T>(std::forward<Args>(args)...);
         }
     };
 }
