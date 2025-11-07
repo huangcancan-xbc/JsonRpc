@@ -1,7 +1,6 @@
 /*
     网络通信相关的操作
 */
-
 #pragma once
 #include <muduo/net/TcpServer.h>       // TCP 服务器类（封装监听、accept、连接管理）
 #include <muduo/net/EventLoop.h>       // 事件循环类（Reactor，负责事件分发）
@@ -12,6 +11,8 @@
 #include "detail.hpp"
 #include "fields.hpp"
 #include "abstract.hpp"
+#include "message.hpp"
+
 
 namespace rpc
 {
@@ -59,6 +60,85 @@ namespace rpc
         static BaseBuffer::ptr create(Args &&...args)
         {
             return std::make_shared<MuduoBuffer>(std::forward<Args>(args)...);
+        }
+    };
+
+
+
+    class LVProtocol : public BaseProtocol
+    {
+    public:
+        using ptr = std::shared_ptr<BaseProtocol>;
+        virtual bool onMessage(const BaseBuffer::ptr &buf, BaseMessage::ptr &msg) override
+        {
+            int32_t total_len = buf->readInt32();  // 读取总长度
+            MType mtype = (MType)buf->readInt32(); // 读取数据类型
+            int32_t idlen = buf->readInt32();      // 读取id长度
+            int32_t body_len = total_len - idlen - idlenFieldsLength - mtypeFieldsLength;
+            std::string id = buf->retrieveAsString(idlen);
+            std::string body = buf->retrieveAsString(body_len);
+            msg = MessageFactory::create(mtype);
+            if (msg.get() == nullptr)
+            {
+                ELOG("消息类型错误，构造消息对象失败！");
+                return false;
+            }
+
+            bool ret = msg->unserialize(body);
+            if (ret == false)
+            {
+                ELOG("消息正文反序列化失败！");
+                return false;
+            }
+
+            msg->setId(id);
+            msg->setMType(mtype);
+
+            return true;
+        }
+
+        virtual std::string serialize(const BaseMessage::ptr &msg) override
+        {
+            std::string body = msg->serialize();
+            std::string id = msg->rid();
+            auto mtype = htonl((int32_t)msg->mtype());
+            int32_t idlen = htonl(id.size());
+            int32_t total_len = htonl(mtypeFieldsLength + idlenFieldsLength + idlen + body.size());
+            std::string result;
+            result.reserve(total_len);
+            result.append((char *)&total_len, lernFieldsLength);
+            result.append((char *)&mtype, mtypeFieldsLength);
+            result.append((char *)&idlen, idlenFieldsLength);
+            result.append(id);
+            result.append(body);
+            return result;
+        }
+
+        // 判断缓冲区中的数据量是否足够一条消息的处理
+        virtual bool canProcessed(const BaseBuffer::ptr &buf) override
+        {
+            int32_t total_len = buf->peekInt32();
+            if (buf->readableSize() < (total_len + lernFieldsLength))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+    private:
+        const size_t lernFieldsLength = 4;
+        const size_t mtypeFieldsLength = 4;
+        const size_t idlenFieldsLength = 4;
+    };
+
+    class ProtocolFactory
+    {
+    public:
+        template <typename... Args>
+        static BaseProtocol::ptr create(Args &&...args)
+        {
+            return std::make_shared<LVProtocol>(std::forward<Args>(args)...);
         }
     };
 }
