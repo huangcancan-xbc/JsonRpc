@@ -141,4 +141,49 @@ namespace rpc
             return std::make_shared<LVProtocol>(std::forward<Args>(args)...);
         }
     };
+
+
+
+    class MuduoConnection : public BaseConnection
+    {
+    public:
+        using ptr = std::shared_ptr<BaseConnection>;
+
+        MuduoConnection(const muduo::net::TcpConnectionPtr conn, const BaseProtocol::ptr &protocol)
+            :  _protocol(protocol),
+            _conn(conn)
+        {
+
+        }
+
+        virtual void send(const BaseMessage::ptr &msg) override
+        {
+            std::string body = _protocol->serialize(msg);
+            _conn->send(body);
+        }
+
+        virtual void shutdown() override
+        {
+            _conn->shutdown();
+        }
+
+        virtual bool connected() override
+        {
+            _conn->connected();
+        }
+
+    private:
+        BaseProtocol::ptr _protocol;
+        muduo::net::TcpConnectionPtr _conn;
+    };
+
+    class ConnetionFactor
+    {
+    public:
+        template <typename... Args>
+        static BaseConnection::ptr create(Args &&...args)
+        {
+            return std::make_shared<MuduoConnection>(std::forward<Args>(args)...);
+        }
+    };
 }
