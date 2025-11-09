@@ -8,10 +8,13 @@
 #include <muduo/net/Buffer.h>          // 缓冲区类（封装读写缓冲区）
 #include <muduo/base/CountDownLatch.h> // 倒计时锁（用于线程同步）
 #include <muduo/net/EventLoopThread.h> // 专用线程封装类，用于在独立线程中运行 EventLoop
+#include <muduo/net/TcpClient.h>       // TCP 客户端类（封装 connect、连接管理）
 #include "detail.hpp"
 #include "fields.hpp"
 #include "abstract.hpp"
 #include "message.hpp"
+#include <mutex>
+#include <unordered_map>
 
 
 namespace rpc
@@ -184,6 +187,131 @@ namespace rpc
         static BaseConnection::ptr create(Args &&...args)
         {
             return std::make_shared<MuduoConnection>(std::forward<Args>(args)...);
+        }
+    };
+
+
+
+    class MuduoServer : public BaseServer
+    {
+    public:
+        using ptr = std::shared_ptr<MuduoServer>;
+
+        MuduoServer(int port)
+            : _server(&_baseloop, muduo::net::InetAddress("0.0.0.0", port), "MuduoServer", muduo::net::TcpServer::kReusePort),
+            _protocol(ProtocolFactory::create())
+        {
+
+        }
+
+        virtual void start()
+        {
+            _server.setConnectionCallback(std::bind(&MuduoServer::onConnection, this, std::placeholders::_1));
+            _server.setMessageCallback(std::bind(&MuduoServer::onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+            _server.start();
+            _baseloop.loop();
+        }
+    private:
+        void onConnection(const muduo::net::TcpConnectionPtr& conn)
+        {
+            if (conn->connected())
+            {
+                std::cout << "连接建立！" << std::endl;
+                auto muduo_conn = ConnetionFactor::create(conn, _protocol);
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    _conns.insert(std::make_pair(conn, muduo_conn));
+                }
+
+                if (_cb_connection)
+                {
+                    _cb_connection(muduo_conn);
+                }
+            }
+            else
+            {
+                std::cout << "连接断开！" << std::endl;
+                BaseConnection::ptr muduo_conn;
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto it = _conns.find(conn);
+                    if (it == _conns.end())
+                    {
+                        return;
+                    }
+
+                    muduo_conn = it->second();
+                    _conns.erase(it);
+                }
+
+                if (_cb_close)
+                {
+                    _cb_close(muduo_conn);
+                }
+            }
+        }
+
+        void onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp time)
+        {
+            auto base_buf = BufferFactory::create(buf);
+
+            while (1)
+            {
+                if (_protocol->canProcessed(base_buf) == false)
+                {
+                    if (base_buf->readableSize() > maxDataSize)
+                    {
+                        conn->shutdown();
+                        ELOG("缓冲区中的数据过大！");
+                        return;
+                    }
+                    break;
+                }
+
+                BaseMessage::ptr msg;
+                bool ret = _protocol->onMessage(base_buf, msg);
+                if (ret == false)
+                {
+                    conn->shutdown();
+                    ELOG("缓冲区中的数据错误！");
+                    return;
+                }
+
+                BaseConnection::ptr base_conn;
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto it = _conns.find(conn);
+                    if (it == _conns.end())
+                    {
+                        return;
+                    }
+
+                    base_conn = it->second;
+                }
+
+                if (_cb_message)
+                {
+                    _cb_message(base_conn, msg);
+                }
+            }
+        }
+
+    private:
+        const size_t maxDataSize = (1 << 16);
+        BaseProtocol::ptr _protocol;
+        muduo::net::EventLoop _baseloop;
+        muduo::net::TcpServer _server;
+        std::mutex _mutex;
+        std::unordered_map<muduo::net::TcpConnectionPtr, BaseConnection::ptr> _conns;
+    };
+
+    class ServerFactor
+    {
+    public:
+        template <typename... Args>
+        static BaseServer::ptr create(Args &&...args)
+        {
+            return std::make_shared<MuduoServer>(std::forward<Args>(args)...);
         }
     };
 }
