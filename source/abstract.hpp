@@ -79,7 +79,7 @@ namespace rpc
 
     using ConnectionCallback = std::function<void(const BaseConnection::ptr &)>;
     using CloseCallback = std::function<void(const BaseConnection::ptr &)>;
-    using MessageCallback = std::function<void(const BaseConnection::ptr &, BaseBuffer::ptr &)>;
+    using MessageCallback = std::function<void(const BaseConnection::ptr &, BaseMessage::ptr &)>;
     class BaseServer
     {
     public:
@@ -99,7 +99,9 @@ namespace rpc
             _cb_message = cb;
         }
 
-    private:
+        virtual void start() = 0;
+
+    protected:
         ConnectionCallback _cb_connection;
         CloseCallback _cb_close;
         MessageCallback _cb_message;
@@ -131,7 +133,7 @@ namespace rpc
         virtual bool connected() = 0;
         virtual BaseConnection::ptr connection() = 0;
 
-    private:
+    protected:
         ConnectionCallback _cb_connection;
         CloseCallback _cb_close;
         MessageCallback _cb_message;
