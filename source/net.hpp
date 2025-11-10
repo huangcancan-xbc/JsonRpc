@@ -106,10 +106,12 @@ namespace rpc
             std::string id = msg->rid();
             auto mtype = htonl((int32_t)msg->mtype());
             int32_t idlen = htonl(id.size());
-            int32_t total_len = htonl(mtypeFieldsLength + idlenFieldsLength + idlen + body.size());
+            int32_t h_total_len = mtypeFieldsLength + idlenFieldsLength + id.size() + body.size();
+            int32_t n_total_len = htonl(h_total_len);
+            DLOG("h_total_len: %d", h_total_len);
             std::string result;
-            result.reserve(total_len);
-            result.append((char *)&total_len, lernFieldsLength);
+            result.reserve(h_total_len);
+            result.append((char *)&n_total_len, lenFieldsLength);
             result.append((char *)&mtype, mtypeFieldsLength);
             result.append((char *)&idlen, idlenFieldsLength);
             result.append(id);
@@ -120,8 +122,14 @@ namespace rpc
         // 判断缓冲区中的数据量是否足够一条消息的处理
         virtual bool canProcessed(const BaseBuffer::ptr &buf) override
         {
+            if(buf->readableSize() < lenFieldsLength)
+            {
+                return false;
+            }
+            
             int32_t total_len = buf->peekInt32();
-            if (buf->readableSize() < (total_len + lernFieldsLength))
+            DLOG("total_len: %d", total_len);
+            if (buf->readableSize() < (total_len + lenFieldsLength))
             {
                 return false;
             }
@@ -130,7 +138,7 @@ namespace rpc
         }
 
     private:
-        const size_t lernFieldsLength = 4;
+        const size_t lenFieldsLength = 4;
         const size_t mtypeFieldsLength = 4;
         const size_t idlenFieldsLength = 4;
     };
@@ -253,6 +261,7 @@ namespace rpc
 
         void onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp)
         {
+            DLOG("连接有新数据到来，开始处理！");
             auto base_buf = BufferFactory::create(buf);
 
             while (1)
@@ -265,9 +274,12 @@ namespace rpc
                         ELOG("缓冲区中的数据过大！");
                         return;
                     }
+
+                    DLOG("数据量不足！");
                     break;
                 }
 
+                DLOG("缓冲区数据可处理！");
                 BaseMessage::ptr msg;
                 bool ret = _protocol->onMessage(base_buf, msg);
                 if (ret == false)
@@ -277,6 +289,7 @@ namespace rpc
                     return;
                 }
 
+                DLOG("消息反序列化成功！");
                 BaseConnection::ptr base_conn;
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
@@ -289,6 +302,7 @@ namespace rpc
                     base_conn = it->second;
                 }
 
+                DLOG("调用回调函数进行消息处理！");
                 if (_cb_message)
                 {
                     _cb_message(base_conn, msg);
@@ -330,6 +344,7 @@ namespace rpc
 
         virtual void connect() override
         {
+            DLOG("设置回调函数，连接服务器！");
             _client.setConnectionCallback(std::bind(&MuduoClient::onConnection, this, std::placeholders::_1));
             // 设置连接消息的回调
             _client.setMessageCallback(std::bind(&MuduoClient::onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
@@ -337,6 +352,7 @@ namespace rpc
             // 连接服务器
             _client.connect();
             _downlatch.wait();
+            DLOG("连接服务器成功！");
         }
 
         virtual void shutdown() override
@@ -383,9 +399,7 @@ namespace rpc
 
         void onMessage(const muduo::net::TcpConnectionPtr &conn, muduo::net::Buffer *buf, muduo::Timestamp)
         {
-            std::string res = buf->retrieveAllAsString();
-            std::cout << res << std::endl;
-
+            DLOG("连接有新数据到来，开始处理！");
             auto base_buf = BufferFactory::create(buf);
             while (1)
             {
@@ -399,9 +413,11 @@ namespace rpc
                         return;
                     }
 
+                    DLOG("数据量不足！");
                     break;
                 }
 
+                DLOG("缓冲区数据可处理！");
                 BaseMessage::ptr msg;
                 bool ret = _protocol->onMessage(base_buf, msg);
                 if (ret == false)
@@ -411,6 +427,7 @@ namespace rpc
                     return;
                 }
 
+                DLOG("缓冲区数据解析完毕！调用回调函数进行处理！");
                 if (_cb_message)
                 {
                     _cb_message(_conn, msg);
