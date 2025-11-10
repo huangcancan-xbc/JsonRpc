@@ -35,14 +35,14 @@
 #include "net.hpp"
 #include <thread>
 
-void onRpcResponse(const rpc::BaseConnection::ptr &conn, rpc::BaseMessage::ptr &msg)
+void onRpcResponse(const rpc::BaseConnection::ptr &conn, rpc::RpcResponse::ptr &msg)
 {
     std::cout << "收到了Rpc响应！";
     std::string body = msg->serialize();
     std::cout << body << std::endl;
 }
 
-void onTopicResponse(const rpc::BaseConnection::ptr &conn, rpc::BaseMessage::ptr &msg)
+void onTopicResponse(const rpc::BaseConnection::ptr &conn, rpc::TopicResponse::ptr &msg)
 {
     std::cout << "收到了Topic响应！";
     std::string body = msg->serialize();
@@ -52,8 +52,8 @@ void onTopicResponse(const rpc::BaseConnection::ptr &conn, rpc::BaseMessage::ptr
 int main()
 {
     auto dispatcher = std::make_shared<rpc::Dispatcher>();
-    dispatcher->registerHandler(rpc::MType::RSP_RPC, onRpcResponse);
-    dispatcher->registerHandler(rpc::MType::RSP_TOPIC, onTopicResponse);
+    dispatcher->registerHandler<rpc::RpcResponse>(rpc::MType::RSP_RPC, onRpcResponse);          // 注册映射关系
+    dispatcher->registerHandler<rpc::TopicResponse>(rpc::MType::RSP_TOPIC, onTopicResponse);    // 注册映射关系
 
     auto client = rpc::ClientFactory::create("127.0.0.1", 8080);
     auto message_cb = std::bind(&rpc::Dispatcher::onMessage, dispatcher.get(), std::placeholders::_1, std::placeholders::_2);

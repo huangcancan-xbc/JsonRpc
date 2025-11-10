@@ -28,7 +28,7 @@
 #include "net.hpp"
 #include "dispatcher.hpp"
 
-void onRpcRequest(const rpc::BaseConnection::ptr &conn, rpc::BaseMessage::ptr &msg)
+void onRpcRequest(const rpc::BaseConnection::ptr &conn, rpc::RpcRequest::ptr &msg)
 {
     std::cout << "收到了Rpc请求：";
     std::string body = msg->serialize();
@@ -41,7 +41,7 @@ void onRpcRequest(const rpc::BaseConnection::ptr &conn, rpc::BaseMessage::ptr &m
     conn->send(rpc_req);
 }
 
-void onTopicRequest(const rpc::BaseConnection::ptr &conn, rpc::BaseMessage::ptr &msg)
+void onTopicRequest(const rpc::BaseConnection::ptr &conn, rpc::TopicRequest::ptr &msg)
 {
     std::cout << "收到了Rpc请求：";
     std::string body = msg->serialize();
@@ -57,8 +57,8 @@ void onTopicRequest(const rpc::BaseConnection::ptr &conn, rpc::BaseMessage::ptr 
 int main()
 {
     auto dispatcher = std::make_shared<rpc::Dispatcher>();
-    dispatcher->registerHandler(rpc::MType::REQ_RPC, onRpcRequest);
-    dispatcher->registerHandler(rpc::MType::REQ_TOPIC, onTopicRequest);
+    dispatcher->registerHandler<rpc::RpcRequest>(rpc::MType::REQ_RPC, onRpcRequest);
+    dispatcher->registerHandler<rpc::TopicRequest>(rpc::MType::REQ_TOPIC, onTopicRequest);
 
     auto server = rpc::ServerFactory::create(8080);
     auto message_cb = std::bind(&rpc::Dispatcher::onMessage, dispatcher.get(), std::placeholders::_1, std::placeholders::_2);
