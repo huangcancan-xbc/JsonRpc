@@ -370,13 +370,13 @@ namespace rpc
         {
             if (conn->connected())
             {
-                std::cout << "连接建立" << std::endl;
+                std::cout << "连接建立！" << std::endl;
                 _downlatch.countDown();
                 _conn = ConnectionFactory::create(conn, _protocol);
             }
             else
             {
-                std::cout << "连接断开" << std::endl;
+                std::cout << "连接断开！" << std::endl;
                 _conn.reset();
             }
         }
