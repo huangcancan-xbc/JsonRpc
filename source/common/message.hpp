@@ -11,7 +11,7 @@ namespace rpc
     class JsonMessage : public BaseMessage
     {
     public:
-        using ptr = std::shared_ptr<BaseMessage>;
+        using ptr = std::shared_ptr<JsonMessage>;
 
         virtual std::string serialize() override
         {
@@ -315,10 +315,10 @@ namespace rpc
             }
 
             if (_body[KEY_OPTYPE].asInt() == (int)ServiceOptype::SERVICE_REGISTRY &&
-                _body[KEY_METHOD].isNull() == true ||
+                (_body[KEY_METHOD].isNull() == true ||
                 _body[KEY_METHOD].isString() == false ||
                 _body[KEY_HOST].isNull() == true ||
-                _body[KEY_HOST].isArray() == false)
+                _body[KEY_HOST].isArray() == false))
             {
                 ELOG("服务发现响应中响应信息字段错误！");
                 return false;

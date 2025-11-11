@@ -180,7 +180,7 @@ namespace rpc
 
         virtual bool connected() override
         {
-            _conn->connected();
+            return _conn->connected();
         }
 
     private:
@@ -369,6 +369,7 @@ namespace rpc
             }
 
             _conn->send(msg);
+            return true;
         }
 
         virtual BaseConnection::ptr connection() override
