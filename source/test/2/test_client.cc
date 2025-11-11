@@ -28,11 +28,9 @@
 //     return 0;
 // }
 
-
-
-#include "message.hpp"
-#include "dispatcher.hpp"
-#include "net.hpp"
+#include "../../common/message.hpp"
+#include "../../common/dispatcher.hpp"
+#include "../../common/net.hpp"
 #include <thread>
 
 void onRpcResponse(const rpc::BaseConnection::ptr &conn, rpc::RpcResponse::ptr &msg)

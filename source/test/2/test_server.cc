@@ -24,9 +24,9 @@
 
 
 
-#include "message.hpp"
-#include "net.hpp"
-#include "dispatcher.hpp"
+#include "../../common/message.hpp"
+#include "../../common/net.hpp"
+#include "../../common/dispatcher.hpp"
 
 void onRpcRequest(const rpc::BaseConnection::ptr &conn, rpc::RpcRequest::ptr &msg)
 {
