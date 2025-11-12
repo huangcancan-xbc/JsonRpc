@@ -49,6 +49,8 @@ namespace rpc
                 {
                     ELOG("请求类型未知！");
                 }
+
+                delDescribe(rid);
             }
 
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, AsyncResponse &async_rsp)
