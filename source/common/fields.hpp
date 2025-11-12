@@ -73,9 +73,8 @@ namespace rpc
     // RPC请求类型定义
     enum class RType
     {
-        REQ_SYNC = 0, // 同步请求
-        REQ_ASYNC,    // 异步请求
-        RSP_CALLBACK  // 回调请求
+        REQ_ASYNC = 0, // 异步请求
+        REQ_CALLBACK   // 回调请求
     };
 
     // Topic（主题）操作类型
