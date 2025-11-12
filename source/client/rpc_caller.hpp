@@ -21,6 +21,7 @@ namespace rpc
 
             bool call(const BaseConnection::ptr &conn, const std::string &method, const Json::Value &params, Json::Value &result)
             {
+                DLOG("开始同步rpc调用！");
                 // 1.组织请求
                 auto req_msg = MessageFactory::create<RpcRequest>();
                 req_msg->setId(UUID::uuid());
@@ -36,6 +37,7 @@ namespace rpc
                     ELOG("同步Rpc请求失败！");
                     return false;
                 }
+                DLOG("收到响应，进行解析，获取结果！");
 
                 // 3.等待响应
                 auto rpc_rsp_msg = std::dynamic_pointer_cast<RpcResponse>(rsp_msg);
@@ -47,11 +49,12 @@ namespace rpc
 
                 if (rpc_rsp_msg->rcode() != RCode::RCODE_OK)
                 {
-                    ELOG("rpc请求出错：%s", errReason(rpc_rsp_msg->rcode()));
+                    ELOG("rpc请求出错：%s", errReason(rpc_rsp_msg->rcode()).c_str());
                     return false;
                 }
 
                 result = rpc_rsp_msg->result();
+                DLOG("结果设置完成！");
                 return true;
             }
 
@@ -63,7 +66,7 @@ namespace rpc
                 req_msg->setMethod(method);
                 req_msg->setParams(params);
 
-                auto json_promise = std::shared_ptr<std::promise<Json::Value>>();
+                auto json_promise = std::make_shared<std::promise<Json::Value>>();
                 result = json_promise->get_future();
                 Requestor::RequestCallback cb = std::bind(&RpcCaller::Callback, this, json_promise, std::placeholders::_1);
                 bool ret = _requestor->send(conn, std::dynamic_pointer_cast<BaseMessage>(req_msg), cb);
@@ -107,7 +110,9 @@ namespace rpc
                 
                 if (rpc_rsp_msg->rcode() != RCode::RCODE_OK)
                 {
-                    ELOG("rpc回调请求出错：%s", errReason(rpc_rsp_msg->rcode()));
+                    ELOG("rpc回调请求出错：%s", errReason(rpc_rsp_msg->rcode()).c_str());
+                    // 回调路径，尝试回传空或者错误信息，这里传空对象表示失败
+                    cb(Json::Value());
                     return;
                 }
 
@@ -120,12 +125,30 @@ namespace rpc
                 if(!rpc_rsp_msg)
                 {
                     ELOG("rpc响应，向下类型转换失败！");
+                    try
+                    {
+                        throw std::runtime_error("rpc响应转换失败！");
+                    }
+                    catch(...)
+                    {
+                        result->set_exception(std::current_exception());
+                    }
+
                     return;
                 }
 
                 if(rpc_rsp_msg->rcode() != RCode::RCODE_OK)
                 {
-                    ELOG("rpc异步请求出错：%s", errReason(rpc_rsp_msg->rcode()));
+                    ELOG("rpc异步请求出错：%s", errReason(rpc_rsp_msg->rcode()).c_str());
+                    // 将错误信息包装进异常，通知等待
+                    try
+                    {
+                        throw std::runtime_error("rpc error: " + errReason(rpc_rsp_msg->rcode()));
+                    }
+                    catch (...)
+                    {
+                        result->set_exception(std::current_exception());
+                    }
                     return;
                 }
 

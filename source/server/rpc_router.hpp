@@ -43,7 +43,7 @@ namespace rpc
                 {
                     if (params.isMember(desc.first) == false)
                     {
-                        ELOG("参数校验失败，存在缺失字段：%d", desc.first.c_str());
+                        ELOG("参数校验失败，存在缺失字段：%s", desc.first.c_str());
                         return false;
                     }
 
@@ -108,8 +108,39 @@ namespace rpc
         class ServiceDescribeFactory
         {
         public:
-            static ServiceDescribe::ptr create();
+            void setMethodName(const std::string &name)
+            {
+                _method_name = name;
+            }
+
+            void setReturnType(VType vtype)
+            {
+                _return_type = vtype;
+            }
+
+            void setParamsDesc(const std::string &pname, VType vtype)
+            {
+                _params_desc.push_back(ServiceDescribe::ParamsDescribe(pname, vtype));
+            }
+
+            void setCallback(const ServiceDescribe::ServiceCallback &cb)
+            {
+                _callback = cb;
+            }
+
+            ServiceDescribe::ptr build()
+            {
+                return std::make_shared<ServiceDescribe>(std::move(_method_name), std::move(_params_desc), _return_type, std::move(_callback));
+            }
+
+        private:
+            std::string _method_name;
+            ServiceDescribe::ServiceCallback _callback;                // 实际的业务回调函数
+            std::vector<ServiceDescribe::ParamsDescribe> _params_desc; // 参数字段格式描述
+            VType _return_type;                                        // 结果作为返回值类型的描述
         };
+
+        
 
         class ServiceManager
         {
@@ -186,7 +217,7 @@ namespace rpc
                 }
 
                 // 4.处理完得到结果，组织响应，向客户端发送
-                return response(conn, request, Json::Value(), RCode::RCODE_OK);
+                return response(conn, request, result, RCode::RCODE_OK);
             }
 
             void registerMethod(const ServiceDescribe::ptr &service)

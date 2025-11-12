@@ -18,10 +18,10 @@ namespace rpc
             struct RequestDescribe
             {
                 using ptr = std::shared_ptr<RequestDescribe>;
-                BaseMessage::ptr request;
-                RType rtype;
-                std::promise<BaseMessage::ptr> response;
-                RequestCallback callbcak;
+                BaseMessage::ptr request;                // 请求对象
+                RType rtype;                             // 请求类型
+                std::promise<BaseMessage::ptr> response; // 用于异步返回
+                RequestCallback callbcak;                // 回调函数
             };
 
             void onResponse(const BaseConnection::ptr &conn, BaseMessage::ptr &msg)
@@ -62,6 +62,7 @@ namespace rpc
                     return false;
                 }
 
+                conn->send(req);
                 async_rsp = rdp->response.get_future();
                 return true;
             }
@@ -88,6 +89,7 @@ namespace rpc
                     return false;
                 }
 
+                conn->send(req);
                 return true;
             }
 
@@ -102,7 +104,11 @@ namespace rpc
                     rd->callbcak = cb;
                 }
 
-                _request_desc.insert(std::make_pair(req->rid(), rd));
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    _request_desc.insert(std::make_pair(req->rid(), rd));
+                }
+
                 return rd;
             }
 
