@@ -95,6 +95,20 @@ namespace rpc
                 _conns.erase(it);
             }
 
+            std::vector<Address> methodHosts(const std::string &method)
+            {
+                std::unique_lock<std::mutex> lock(_mutex);
+
+                auto it = _providers.find(method);
+                if(it == _providers.end())
+                {
+                    return std::vector<Address>();
+                }
+
+                std::vector<Address> result(it->second.begin(), it->second.end());
+                return result;
+            }
+
         private:
             std::mutex _mutex;
             std::unordered_map<std::string, std::set<Provider::ptr>> _providers;
@@ -236,14 +250,17 @@ namespace rpc
                 {
                     _providers->addProvider(conn, msg->host(), msg->method());
                     _discoverers->onlineNotify(msg->method(), msg->host());
+                    return registryRespose(conn, msg);
                 }
                 else if(optype == ServiceOptype::SERVICE_DISCOVERY)
                 {
                     _discoverers->addDiscoverer(conn, msg->method());
+                    return discoveryResponse(conn, msg);
                 }
                 else
                 {
                     ELOG("收到服务操作请求，但是操作类型错误！");
+                    return errorResponse(conn, msg);
                 }
             }
 
@@ -261,6 +278,47 @@ namespace rpc
                 }
 
                 _discoverers->delDiscoverer(conn);
+            }
+
+        private:
+            void errorResponse(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
+            {
+                auto msg_rsp = MessageFactory::create<ServiceResponse>();
+                msg_rsp->setId(msg->rid());
+                msg_rsp->setMType(MType::RSP_SERVICE);
+                msg_rsp->setRCode(RCode::RCODE_INVALID_OPTYPE);
+                msg_rsp->setOptype(ServiceOptype::SERVICE_UNKNOW);
+                conn->send(msg_rsp);
+            }
+
+            void registryRespose(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
+            {
+                auto msg_rsp = MessageFactory::create<ServiceResponse>();
+                msg_rsp->setId(UUID::uuid());
+                msg_rsp->setMType(MType::REQ_SERVICE);
+                msg_rsp->setRCode(RCode::RCODE_OK);
+                msg_rsp->setOptype(ServiceOptype::SERVICE_REGISTRY);
+                conn->send(msg_rsp);
+            }
+
+            void discoveryResponse(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
+            {
+                auto msg_rsp = MessageFactory::create<ServiceResponse>();
+                msg_rsp->setId(msg->rid());
+                msg_rsp->setMType(MType::RSP_SERVICE);
+                msg_rsp->setOptype(ServiceOptype::SERVICE_DISCOVERY);
+                std::vector<Address> hosts = _providers->methodHosts(msg->method());
+
+                if (hosts.empty())
+                {
+                    msg_rsp->setRCode(RCode::RCODE_NOT_FOUND_SERVICE);
+                    return conn->send(msg_rsp);
+                }
+                
+                msg_rsp->setRCode(RCode::RCODE_OK);
+                msg_rsp->setMethod(msg->method());
+                msg_rsp->setHost(hosts);
+                return conn->send(msg_rsp);
             }
 
         private:

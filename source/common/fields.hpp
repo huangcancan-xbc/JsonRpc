@@ -94,5 +94,6 @@ namespace rpc
         SERVICE_DISCOVERY,    // 服务发现
         SERVICE_ONLINE,       // 服务上线
         SERVICE_OFFLINE,      // 服务下线
+        SERVICE_UNKNOW        // 服务未知
     };
 }
