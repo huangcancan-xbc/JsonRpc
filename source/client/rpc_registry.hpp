@@ -119,10 +119,12 @@ namespace rpc
         class Discoverer
         {
         public:
+            using OfflineCallback = std::function<void(const Address&)>;
             using ptr = std::shared_ptr<Discoverer>;
 
-            Discoverer(const Requestor::ptr &requestor)
-                :_requestor(requestor)
+            Discoverer(const Requestor::ptr &requestor, const OfflineCallback &cb)
+                :_requestor(requestor),
+                _offline_callback(cb)
             {
                 
             }
@@ -215,10 +217,12 @@ namespace rpc
                         return;
                     }
                     it->second->removeHost(msg->host());
+                    _offline_callback(msg->host());
                 }
             }
 
         private:
+            OfflineCallback _offline_callback;
             std::mutex _mutex;
             std::unordered_map<std::string, MethodHost::ptr> _method_hosts;
             Requestor::ptr _requestor;
