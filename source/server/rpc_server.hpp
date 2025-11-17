@@ -51,6 +51,7 @@ namespace rpc
 
         class RpcServer
         {
+        public:
             using ptr = std::shared_ptr<RpcServer>;
 
             RpcServer(const Address &access_addr,

@@ -43,7 +43,7 @@ namespace rpc
 
                 if(service_rsp->rcode() != RCode::RCODE_OK)
                 {
-                    ELOG("服务注册失败，原因：%s", errReason(service_rsp->rcode()));
+                    ELOG("服务注册失败，原因：%s", errReason(service_rsp->rcode()).c_str());
                     return false;
                 }
 

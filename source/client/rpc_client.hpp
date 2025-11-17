@@ -51,7 +51,7 @@ namespace rpc
             using ptr = std::shared_ptr<DiscoveryClient>;
 
             // 构造函数传入注册中心的地址信息，用于连接注册中心
-            DiscoveryClient(const std::string &ip, int port, Discoverer::OfflineCallback &cb)
+            DiscoveryClient(const std::string &ip, int port, const Discoverer::OfflineCallback &cb)
                 : _requestor(std::make_shared<Requestor>()),
                   _discoverer(std::make_shared<client::Discoverer>(_requestor, cb)),
                   _dispatcher(std::make_shared<Dispatcher>())
@@ -102,9 +102,10 @@ namespace rpc
 
                 // 如果启用了服务发现，地址信息就是注册中心的地址，是服务发现客户端需要连接的地址，那么就通过地址信息实例化discovery_client
                 // 如果没有启动服务发现，那么地址信息就是服务提供者的地址，直接实例化好rpc_client
-                if(-enableDiscovery)
+                if(_enableDiscovery)
                 {
-                    _discovery_client = std::make_shared<DiscoveryClient>(ip, port);
+                    auto offline_cb = std::bind(&RpcClient::delClient, this, std::placeholders::_1);
+                    _discovery_client = std::make_shared<DiscoveryClient>(ip, port, offline_cb);
                 }
                 else
                 {
@@ -217,7 +218,7 @@ namespace rpc
         private:
             struct AddressHash
             {
-                size_t operator()(const Address &host)
+                size_t operator()(const Address &host) const
                 {
                     std::string addr = host.first + std::to_string(host.second);
                     return std::hash<std::string>{}(addr);

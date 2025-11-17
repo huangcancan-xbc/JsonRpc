@@ -24,7 +24,7 @@ namespace rpc
     #define LINF 1
     #define LERR 2
 
-    #define LDEFAULT LDBG
+    #define LDEFAULT LINF
 
     #define LOG(level, format, ...) {\
         if(level >= LDEFAULT)\

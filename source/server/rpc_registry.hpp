@@ -105,7 +105,12 @@ namespace rpc
                     return std::vector<Address>();
                 }
 
-                std::vector<Address> result(it->second.begin(), it->second.end());
+                std::vector<Address> result;
+                for(auto &provider : it->second)
+                {
+                    result.push_back(provider->host);
+                }
+                
                 return result;
             }
 
