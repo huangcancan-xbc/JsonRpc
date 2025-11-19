@@ -67,10 +67,10 @@ namespace rpc
                     _reg_client = std::make_shared<client::RegistryClient>(registry_server_addr.first, registry_server_addr.second);
                 }
 
-                auto rpc_cb = std::bind(&rpc::server::RpcRouter::onRpcRequest, _router.get(), std::placeholders::_1, std::placeholders::_2);
+                auto rpc_cb = std::bind(&RpcRouter::onRpcRequest, _router.get(), std::placeholders::_1, std::placeholders::_2);
                 _dispatcher->registerHandler<rpc::RpcRequest>(rpc::MType::REQ_RPC, rpc_cb);
 
-                _server=rpc::ServerFactory::create(access_addr.second);
+                _server = rpc::ServerFactory::create(access_addr.second);
                 auto message_cb = std::bind(&rpc::Dispatcher::onMessage, _dispatcher.get(), std::placeholders::_1, std::placeholders::_2);
                 _server->setMessageCallback(message_cb);
             }

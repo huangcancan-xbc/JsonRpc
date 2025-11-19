@@ -335,9 +335,11 @@ namespace rpc
         using ptr = std::shared_ptr<MuduoClient>;
 
         MuduoClient(const std::string &sip, int sport)
-            : _protocol(ProtocolFactory::create()),
+            : _loopthread(),
               _baseloop(_loopthread.startLoop()),
               _downlatch(1),
+              _protocol(ProtocolFactory::create()),
+              _conn(),
               _client(_baseloop, muduo::net::InetAddress(sip, sport), "MuduoClient")
         {
         }
@@ -388,8 +390,11 @@ namespace rpc
             if (conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;
-                _downlatch.countDown();
-                _conn = ConnectionFactory::create(conn, _protocol);
+                _conn = ConnectionFactory::create(conn, _protocol); // 所以：先创建并赋值对象，确保数据就绪
+
+                // 之前的代码在这里可能发生了线程切换/竞争！
+
+                _downlatch.countDown(); // 这里的操作作为一个“内存屏障”，保证之前的写操作对主线程可见，然后再唤醒主线程
             }
             else
             {
@@ -438,11 +443,11 @@ namespace rpc
 
     private:
         const size_t maxDataSize = (1 << 16);
-        BaseProtocol::ptr _protocol;
-        BaseConnection::ptr _conn;
-        muduo::CountDownLatch _downlatch;
         muduo::net::EventLoopThread _loopthread;
         muduo::net::EventLoop *_baseloop;
+        muduo::CountDownLatch _downlatch;
+        BaseProtocol::ptr _protocol;
+        BaseConnection::ptr _conn;
         muduo::net::TcpClient _client;
     };
 

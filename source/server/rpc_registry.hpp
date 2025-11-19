@@ -185,7 +185,7 @@ namespace rpc
                 
                 for(auto &method: it->second->methods)
                 {
-                    auto discoverers = _discoverers[method];
+                    auto& discoverers = _discoverers[method];
                     discoverers.erase(it->second);
                 }
 
@@ -299,8 +299,8 @@ namespace rpc
             void registryRespose(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
             {
                 auto msg_rsp = MessageFactory::create<ServiceResponse>();
-                msg_rsp->setId(UUID::uuid());
-                msg_rsp->setMType(MType::REQ_SERVICE);
+                msg_rsp->setId(msg->rid());
+                msg_rsp->setMType(MType::RSP_SERVICE);
                 msg_rsp->setRCode(RCode::RCODE_OK);
                 msg_rsp->setOptype(ServiceOptype::SERVICE_REGISTRY);
                 conn->send(msg_rsp);

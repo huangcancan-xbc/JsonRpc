@@ -37,8 +37,13 @@ namespace rpc
             }
 
         private:
-            client::Provider::ptr _provider;
+            // 犯了一个最愚蠢的错误：初始化列表的初始化顺序！导致 _provider 拿到的是一个还没构造好的 _requestor（空指针），然后在里面加锁直接炸成 std::system_error；
+            // 回调 + 线程里，用同步原语（CountDownLatch 等）时，唤醒顺序也要保证被唤醒线程看到的是“完全初始化好的状态”。
+            // client::Provider::ptr _provider;
+            // Requestor::ptr _requestor;
+
             Requestor::ptr _requestor;
+            client::Provider::ptr _provider;
             Dispatcher::ptr _dispatcher;
             BaseClient::ptr _client;
         };
@@ -156,6 +161,7 @@ namespace rpc
             {
                 auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), std::placeholders::_1, std::placeholders::_2);
                 auto client = ClientFactory::create(host.first, host.second);
+                client->setMessageCallback(message_cb);
                 client->connect();
                 putClient(host, client);
                 return client;
