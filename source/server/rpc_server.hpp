@@ -108,7 +108,7 @@ namespace rpc
             using ptr = std::shared_ptr<TopicServer>;
 
             TopicServer(int port)
-                : _topic_manager(std::make_shared<TopicServer>()),
+                : _topic_manager(std::make_shared<TopicManager>()),
                   _dispatcher(std::make_shared<rpc::Dispatcher>())
             {
                 auto topic_cb = std::bind(&TopicManager::onTopicRequest, _topic_manager.get(), std::placeholders::_1, std::placeholders::_2);
