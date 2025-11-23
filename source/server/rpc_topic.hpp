@@ -15,12 +15,94 @@ namespace rpc
 
             TopicManager()
             {
-
             }
 
-            void onTopicRequest(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg);
-            void onShutdown(const BaseConnection::ptr &conn);
+            void onTopicRequest(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
+            {
+                TopicOptype topic_optype = msg->optype();
+                bool ret = true;
+
+                switch (topic_optype)
+                {
+                case TopicOptype::TOPIC_CREATE:
+                    topicCreate(conn, msg);
+                    break;
+                case TopicOptype::TOPIC_REMOVE:
+                    topicRemove(conn, msg);
+                    break;
+                case TopicOptype::TOPIC_SUBSCRIBE:
+                    topicSubscribe(conn, msg);
+                    break;
+                case TopicOptype::TOPIC_CANCEL:
+                    topicCancel(conn, msg);
+                    break;
+                case TopicOptype::TOPIC_PUBLISH:
+                    ret = topicPublish(conn, msg);
+                    break;
+                default:
+                    return errorResponse(conn, msg, RCode::RCODE_INVALID_OPTYPE);
+                }
+
+                if (!ret)
+                {
+                    return errorResponse(conn, msg, RCode::RCODE_NOT_FOUND_TOPIC);
+                }
+
+                return topicResponse(conn, msg);
+            }
+
+            void onShutdown(const BaseConnection::ptr &conn)
+            {
+                std::vector<Topic::ptr> topics;
+                Subscriber::ptr subscriber;
+
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto it = _subscribers.find(conn);
+                    if (it == _subscribers.end())
+                    {
+                        return;
+                    }
+
+                    for (auto &topic_name : subscriber->topics)
+                    {
+                        auto topic_it = _topics.find(topic_name);
+                        if (topic_it == _topics.end())
+                        {
+                            continue;
+                        }
+
+                        topics.push_back(topic_it->second);
+                    }
+
+                    _subscribers.erase(it);
+                }
+
+                for (auto &topic : topics)
+                {
+                    topic->removeSubscriber(subscriber);
+                }
+            }
+
         private:
+            void errorResponse(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg, RCode rcode)
+            {
+                auto msg_rsp = MessageFactory::create<TopicResponse>();
+                msg_rsp->setId(msg->rid());
+                msg_rsp->setMType(MType::RSP_TOPIC);
+                msg_rsp->setRCode(rcode);
+                conn->send(msg_rsp);
+            }
+
+            void topicResponse(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
+            {
+                auto msg_rsp = MessageFactory::create<TopicResponse>();
+                msg_rsp->setId(msg->rid());
+                msg_rsp->setMType(MType::RSP_TOPIC);
+                msg_rsp->setRCode(RCode::RCODE_OK);
+                conn->send(msg_rsp);
+            }
+
             void topicCreate(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -33,38 +115,28 @@ namespace rpc
             void topicRemove(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 std::string topic_name = msg->topicKey();
-                std::vector<Subscriber::ptr> subscribers;
+                std::unordered_set<Subscriber::ptr> subscribers;
 
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     // 删除主题之前要先找出会受到影响的订阅者
                     auto it = _topics.find(topic_name);
-                    if(it == _topics.end())
+                    if (it == _topics.end())
                     {
                         return;
                     }
 
-                    for(auto &conn : it->second->subscribers)
-                    {
-                        auto it_sub = _subscribers.find(conn);
-                        if(it_sub ==_subscribers.end())
-                        {
-                            continue;
-                        }
-
-                        subscribers.push_back(it_sub->second);
-                    }
-
+                    subscribers = it->second->subscribers;
                     _topics.erase(it);
                 }
 
-                for(auto &subscriber : subscribers)
+                for (auto &subscriber : subscribers)
                 {
                     subscriber->removeTopic(topic_name);
                 }
             }
 
-            bool topicSubscriber(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
+            bool topicSubscribe(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 Topic::ptr topic;
                 Subscriber::ptr subscriber;
@@ -72,25 +144,25 @@ namespace rpc
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     auto topic_it = _topics.find(msg->topicKey());
-                    if(topic_it == _topics.end())
+                    if (topic_it == _topics.end())
                     {
                         return false;
                     }
 
                     topic = topic_it->second;
                     auto sub_it = _subscribers.find(conn);
-                    if(sub_it == _subscribers.end())
+                    if (sub_it == _subscribers.end())
                     {
                         subscriber = sub_it->second;
                     }
                     else
                     {
-                        subscriber=std::make_shared<Subscriber>(conn);
+                        subscriber = std::make_shared<Subscriber>(conn);
                         _subscribers.insert(std::make_pair(conn, subscriber));
                     }
                 }
 
-                topic->appendSubscriber(conn);
+                topic->appendSubscriber(subscriber);
                 subscriber->appendTopic(msg->topicKey());
                 return true;
             }
@@ -115,14 +187,14 @@ namespace rpc
                     }
                 }
 
-                if(topic)
-                {
-                    topic->removeSubscriber(conn);
-                }
-
-                if(subscriber)
+                if (subscriber)
                 {
                     subscriber->removeTopic(msg->topicKey());
+                }
+
+                if (topic && subscriber)
+                {
+                    topic->removeSubscriber(subscriber);
                 }
             }
 
@@ -133,7 +205,7 @@ namespace rpc
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     auto topic_it = _topics.find(msg->topicKey());
-                    if(topic_it == _topics.end())
+                    if (topic_it == _topics.end())
                     {
                         return false;
                     }
@@ -146,55 +218,16 @@ namespace rpc
             }
 
         private:
-            struct Topic
-            {
-                using ptr = std::shared_ptr<Topic>;
-                std::mutex _mutex;
-                std::string topic_name;
-                std::unordered_set<BaseConnection::ptr> subscribers; // 当前主题的订阅者
-
-                Topic(const std::string &name)
-                    :topic_name(name)
-                {
-                    
-                }
-
-                // 新增订阅的时候进行调用
-                void appendSubscriber(const BaseConnection::ptr &conn)
-                {
-                    std::unique_lock<std::mutex> lock(_mutex);
-                    subscribers.insert(conn);
-                }
-
-                // 取消订阅或者订阅者连接断开的时候调用
-                void removeSubscriber(const BaseConnection::ptr &conn)
-                {
-                    std::unique_lock<std::mutex> lock(_mutex);
-                    subscribers.erase(conn);
-                }
-
-                // 收到消息发布请求的时候调用
-                void pushMessage(const BaseMessage::ptr &msg)
-                {
-                    std::unique_lock<std::mutex> lock(_mutex);
-                    for (auto &subscriber : subscribers)
-                    {
-                        subscriber->send(msg);
-                    }
-                }
-            };
-
             struct Subscriber
             {
-                using ptr =std::shared_ptr<Subscriber>;
+                using ptr = std::shared_ptr<Subscriber>;
                 std::mutex _mutex;
                 BaseConnection::ptr conn;
-                std::unordered_set<std::string> topics;// 订阅者订阅的主题名称
+                std::unordered_set<std::string> topics; // 订阅者订阅的主题名称
 
                 Subscriber(const BaseConnection::ptr &c)
-                    :conn(c)
+                    : conn(c)
                 {
-
                 }
 
                 // 订阅主题的时候调用
@@ -209,6 +242,43 @@ namespace rpc
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     topics.erase(topic_name);
+                }
+            };
+
+            struct Topic
+            {
+                using ptr = std::shared_ptr<Topic>;
+                std::mutex _mutex;
+                std::string topic_name;
+                std::unordered_set<Subscriber::ptr> subscribers; // 当前主题的订阅者
+
+                Topic(const std::string &name)
+                    : topic_name(name)
+                {
+                }
+
+                // 新增订阅的时候进行调用
+                void appendSubscriber(const Subscriber::ptr &subscriber)
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    subscribers.insert(subscriber);
+                }
+
+                // 取消订阅或者订阅者连接断开的时候调用
+                void removeSubscriber(const Subscriber::ptr &subscriber)
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    subscribers.erase(subscriber);
+                }
+
+                // 收到消息发布请求的时候调用
+                void pushMessage(const BaseMessage::ptr &msg)
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    for (auto &subscriber : subscribers)
+                    {
+                        subscriber->conn->send(msg);
+                    }
                 }
             };
 
