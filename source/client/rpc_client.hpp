@@ -3,6 +3,7 @@
 #include "requestor.hpp"
 #include "rpc_caller.hpp"
 #include "rpc_registry.hpp"
+#include "rpc_topic.hpp"
 
 
 namespace rpc
@@ -239,6 +240,66 @@ namespace rpc
             BaseClient::ptr _rpc_client;
             std::mutex _mutex;
             std::unordered_map<Address, BaseClient::ptr, AddressHash> _rpc_clients;
+        };
+
+
+
+        class TopicClient
+        {
+        public:
+            TopicClient(const std::string &ip,int port)
+                :_requestor(std::make_shared<Requestor>()),
+                _dispatcher(std::make_shared<Dispatcher>()),
+                _topic_manager(std::make_shared<TopicManager>(_requestor))
+            {
+                auto rsp_cb = std::bind(&client::Requestor::onResponse, _requestor.get(), std::placeholders::_1, std::placeholders::_2);
+                _dispatcher->registerHandler<BaseMessage>(MType::RSP_TOPIC, rsp_cb);
+
+                auto msg_cb = std::bind(&TopicManager::onPublish, _topic_manager.get(), std::placeholders::_1, std::placeholders::_2);
+                _dispatcher->registerHandler<TopicRequest>(MType::REQ_TOPIC, msg_cb);
+
+                auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), std::placeholders::_1, std::placeholders::_2);
+
+                _rpc_client = ClientFactory::create(ip, port);
+                _rpc_client->setMessageCallback(message_cb);
+                _rpc_client->connect();
+            }
+
+            bool create(const std::string &key)
+            {
+                return _topic_manager->create(_rpc_client->connection(), key);
+            }
+
+            bool remove(const std::string &key)
+            {
+                return _topic_manager->remove(_rpc_client->connection(), key);
+            }
+
+            bool subscribe(const std::string &key, const TopicManager::SubCallback &cb)
+            {
+                return _topic_manager->subscribe(_rpc_client->connection(), key, cb);
+            }
+
+            bool cancel(const std::string &key)
+            {
+                return _topic_manager->cancel(_rpc_client->connection(), key);
+            }
+
+            bool publish(const std::string &key, const std::string &msg)
+            {
+                return _topic_manager->publish(_rpc_client->connection(), key, msg);
+            }
+
+            void shutdown()
+            {
+                _rpc_client->shutdown();
+            }
+
+        private:
+            Requestor::ptr _requestor;
+            TopicManager::ptr _topic_manager;
+            Dispatcher::ptr _dispatcher;
+            BaseClient::ptr _rpc_client;
         };
     }
 }
