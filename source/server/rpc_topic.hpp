@@ -64,6 +64,7 @@ namespace rpc
                         return;
                     }
 
+                    subscriber = it->second;
                     for (auto &topic_name : subscriber->topics)
                     {
                         auto topic_it = _topics.find(topic_name);
@@ -151,7 +152,7 @@ namespace rpc
 
                     topic = topic_it->second;
                     auto sub_it = _subscribers.find(conn);
-                    if (sub_it == _subscribers.end())
+                    if (sub_it != _subscribers.end())
                     {
                         subscriber = sub_it->second;
                     }
@@ -181,7 +182,7 @@ namespace rpc
                     }
 
                     auto sub_it = _subscribers.find(conn);
-                    if (sub_it == _subscribers.end())
+                    if (sub_it != _subscribers.end())
                     {
                         subscriber = sub_it->second;
                     }

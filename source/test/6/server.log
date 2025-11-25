@@ -1,0 +1,8 @@
+20251125 12:44:57.669811Z 56202 INFO  TcpServer::newConnection [MuduoServer] - new connection [MuduoServer-0.0.0.0:8888#1] from 127.0.0.1:50880 - TcpServer.cc:80
+连接建立！
+20251125 12:45:03.477716Z 56202 INFO  TcpServer::newConnection [MuduoServer] - new connection [MuduoServer-0.0.0.0:8888#2] from 127.0.0.1:50892 - TcpServer.cc:80
+连接建立！
+连接断开！
+20251125 12:45:03.480089Z 56202 INFO  TcpServer::removeConnectionInLoop [MuduoServer] - connection MuduoServer-0.0.0.0:8888#2 - TcpServer.cc:109
+连接断开！
+20251125 12:45:07.668482Z 56202 INFO  TcpServer::removeConnectionInLoop [MuduoServer] - connection MuduoServer-0.0.0.0:8888#1 - TcpServer.cc:109

@@ -94,7 +94,7 @@ namespace rpc
                 _topic_callbacks.erase(key);
             }
 
-            const SubCallback &getSubscribe(const std::string &key)
+            const SubCallback getSubscribe(const std::string &key)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
                 auto it = _topic_callbacks.find(key);
@@ -138,7 +138,7 @@ namespace rpc
 
                 if (topic_rsp_msg->rcode() != RCode::RCODE_OK)
                 {
-                    ELOG("主题操作请求出错：%s", errReason(topic_rsp_msg->rcode()));
+                    ELOG("主题操作请求出错：%s", errReason(topic_rsp_msg->rcode()).c_str());
                     return false;
                 }
 

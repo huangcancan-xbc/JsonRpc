@@ -1,0 +1,13 @@
+20251125 12:44:57.669625Z 56238 INFO  TcpClient::TcpClient[MuduoClient] - connector 0x556264FE0BC0 - TcpClient.cc:69
+20251125 12:44:57.669677Z 56238 INFO  TcpClient::connect[MuduoClient] - connecting to 127.0.0.1:8888 - TcpClient.cc:107
+连接建立！
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-0
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-1
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-2
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-3
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-4
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-5
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-6
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-7
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-8
+[11-25 20:45:03][subscribe_client.cc:6] hello 主题收到推送过来的消息: Hello World-9
