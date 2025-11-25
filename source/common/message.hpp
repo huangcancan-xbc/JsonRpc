@@ -314,7 +314,7 @@ namespace rpc
                 return false;
             }
 
-            if (_body[KEY_OPTYPE].asInt() == (int)ServiceOptype::SERVICE_REGISTRY &&
+            if (_body[KEY_OPTYPE].asInt() == (int)ServiceOptype::SERVICE_DISCOVERY &&
                 (_body[KEY_METHOD].isNull() == true ||
                 _body[KEY_METHOD].isString() == false ||
                 _body[KEY_HOST].isNull() == true ||

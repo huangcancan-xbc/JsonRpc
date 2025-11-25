@@ -8,10 +8,10 @@ namespace rpc
 {
     namespace server
     {
-        class ProviderManger
+        class ProviderManager
         {
         public:
-            using ptr = std::shared_ptr<ProviderManger>;
+            using ptr = std::shared_ptr<ProviderManager>;
             struct Provider
             {
                 using ptr = std::shared_ptr<Provider>;
@@ -242,7 +242,7 @@ namespace rpc
             using ptr=std::shared_ptr<PDManager>;
 
             PDManager()
-                :_providers(std::make_shared<ProviderManger>()),
+                :_providers(std::make_shared<ProviderManager>()),
                 _discoverers(std::make_shared<DiscovererManager>())
             {
 
@@ -255,7 +255,7 @@ namespace rpc
                 {
                     _providers->addProvider(conn, msg->host(), msg->method());
                     _discoverers->onlineNotify(msg->method(), msg->host());
-                    return registryRespose(conn, msg);
+                    return registryResponse(conn, msg);
                 }
                 else if(optype == ServiceOptype::SERVICE_DISCOVERY)
                 {
@@ -296,7 +296,7 @@ namespace rpc
                 conn->send(msg_rsp);
             }
 
-            void registryRespose(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
+            void registryResponse(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
             {
                 auto msg_rsp = MessageFactory::create<ServiceResponse>();
                 msg_rsp->setId(msg->rid());
@@ -327,7 +327,7 @@ namespace rpc
             }
 
         private:
-            ProviderManger::ptr _providers;
+            ProviderManager::ptr _providers;
             DiscovererManager::ptr _discoverers;
         };
     }

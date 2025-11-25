@@ -30,10 +30,7 @@ namespace rpc
 
             bool subscribe(const BaseConnection::ptr &conn, const std::string &key, const SubCallback &cb)
             {
-                {
-                    std::unique_lock<std::mutex> lock(_mutex);
-                    _topic_callbacks.insert(std::make_pair(key, cb));
-                }
+                addSubscribe(key, cb);
 
                 bool ret = commonRequest(conn, key, TopicOptype::TOPIC_SUBSCRIBE);
                 if (ret == false)

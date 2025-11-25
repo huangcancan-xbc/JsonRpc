@@ -21,7 +21,7 @@ namespace rpc
                 BaseMessage::ptr request;                // 请求对象
                 RType rtype;                             // 请求类型
                 std::promise<BaseMessage::ptr> response; // 用于异步返回
-                RequestCallback callbcak;                // 回调函数
+                RequestCallback callback;                // 回调函数
             };
 
             void onResponse(const BaseConnection::ptr &conn, BaseMessage::ptr &msg)
@@ -40,9 +40,9 @@ namespace rpc
                 }
                 else if(rdp->rtype == RType::REQ_CALLBACK)
                 {
-                    if(rdp->callbcak)
+                    if(rdp->callback)
                     {
-                        rdp->callbcak(msg);
+                        rdp->callback(msg);
                     }
                 }
                 else
@@ -101,7 +101,7 @@ namespace rpc
                 rd->rtype = rtype;
                 if(rtype == RType::REQ_CALLBACK && cb)
                 {
-                    rd->callbcak = cb;
+                    rd->callback = cb;
                 }
 
                 {

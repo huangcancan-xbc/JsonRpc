@@ -34,7 +34,7 @@ namespace rpc
     enum class RCode
     {
         RCODE_OK = 0,            // 成功处理
-        RCODE_PAPSE_FAILED,      // 消息解析失败
+        RCODE_PARSE_FAILED,      // 消息解析失败
         RCODE_ERROR_MSGTYPE,     // 消息类型错误
         RCODE_INVALID_MSG,       // 无效的消息
         RCODE_DISCONNECTED,      // 连接断开
@@ -42,7 +42,7 @@ namespace rpc
         RCODE_NOT_FOUND_SERVICE, // 没有找到对应的服务（服务未注册/下线）
         RCODE_INVALID_OPTYPE,    // 无效的操作类型
         RCODE_NOT_FOUND_TOPIC,   // 没有找到对应的主题
-        RCODE_INVALID_ERROR      // 内部错误
+        RCODE_INTERNAL_ERROR     // 内部错误
     };
 
     // 错误码定义
@@ -50,7 +50,7 @@ namespace rpc
     {
         static std::unordered_map<RCode, std::string> err_map = {
             {RCode::RCODE_OK, "成功处理！"},
-            {RCode::RCODE_PAPSE_FAILED, "消息解析失败！"},
+            {RCode::RCODE_PARSE_FAILED, "消息解析失败！"},
             {RCode::RCODE_ERROR_MSGTYPE, "消息类型错误"},
             {RCode::RCODE_INVALID_MSG, "无效的消息！"},
             {RCode::RCODE_DISCONNECTED, "连接断开！"},
@@ -58,7 +58,7 @@ namespace rpc
             {RCode::RCODE_NOT_FOUND_SERVICE, "没有找到对应的服务！"},
             {RCode::RCODE_INVALID_OPTYPE, "无效的操作类型！"},
             {RCode::RCODE_NOT_FOUND_TOPIC, "没有找到对应的主题！"},
-            {RCode::RCODE_INVALID_ERROR, "内部错误！"}};
+            {RCode::RCODE_INTERNAL_ERROR, "内部错误！"}};
 
         auto it = err_map.find(code);
         if (it == err_map.end())

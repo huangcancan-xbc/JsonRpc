@@ -42,7 +42,7 @@ namespace rpc
             return _buf->readInt32();
         }
 
-        virtual void retrievenInt32() override
+        virtual void retrieveInt32() override
         {
             return _buf->retrieveInt32();
         }

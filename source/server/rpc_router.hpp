@@ -213,7 +213,7 @@ namespace rpc
                 if(ret == false)
                 {
                     ELOG("%s 服务参数校验失败！", request->method().c_str());
-                    return response(conn, request, Json::Value(), RCode::RCODE_INVALID_ERROR);
+                    return response(conn, request, Json::Value(), RCode::RCODE_INTERNAL_ERROR);
                 }
 
                 // 4.处理完得到结果，组织响应，向客户端发送

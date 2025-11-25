@@ -52,7 +52,7 @@ namespace rpc
         virtual size_t readableSize() = 0;
         virtual int32_t peekInt32() = 0;
         virtual int32_t readInt32() = 0;
-        virtual void retrievenInt32() = 0;
+        virtual void retrieveInt32() = 0;
         virtual std::string retrieveAsString(size_t len) = 0;
     };
 
