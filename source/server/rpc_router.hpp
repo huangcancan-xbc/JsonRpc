@@ -1,3 +1,8 @@
+/*
+    RPC路由：收到RPC请求后，找到对应的业务函数，检查参数，然后调用执行。
+    * 用函数名做key映射完整函数
+    * rpc请求查找->参数校->函数调用->响应组织
+*/
 #pragma once
 #include "../common/net.hpp"
 #include "../common/message.hpp"
@@ -6,25 +11,28 @@ namespace rpc
 {
     namespace server
     {
+        // 字段类型（用于参数/返回值）
         enum class VType
         {
-            BOOL = 0,
-            INTEGRAL,
-            NUMERIC,
-            STRING,
-            ARRAY,
-            OBJECT
+            BOOL = 0, // bool
+            INTEGRAL, // 整数
+            NUMERIC,  // 数字（小数）
+            STRING,   // string
+            ARRAY,    // 数组
+            OBJECT    // 对象
         };
 
 
 
+        // rpc服务的所有信息
         class ServiceDescribe
         {
         public:
             using ptr = std::shared_ptr<ServiceDescribe>;
             using ServiceCallback = std::function<void(const Json::Value &, Json::Value &)>;
-            using ParamsDescribe = std::pair<std::string, VType>;
+            using ParamsDescribe = std::pair<std::string, VType>;   // 字段（也就是形参）+类型
 
+            // 参数分别是函数名、参数列表信息（字段/形参+类型）、返回值类型、处理回调
             ServiceDescribe(const std::string &&mname, std::vector<ParamsDescribe> &&desc, VType vtype, const ServiceCallback &&handler)
                 :_method_name(std::move(mname)),
                 _callback(std::move(handler)),
@@ -39,6 +47,7 @@ namespace rpc
             bool paramCheck(const Json::Value &params)
             {
                 // 对params进行参数校验：判断所描述的字段是否存在，类型一不一致
+                // 分别判断形参是否存在和类型是否与之匹配
                 for (auto &desc : _params_desc)
                 {
                     if (params.isMember(desc.first) == false)
@@ -105,6 +114,7 @@ namespace rpc
 
 
 
+        // 构建ServiceDescribe简单工厂，设置函数名、返回值类型、参数列表信息、回调函数
         class ServiceDescribeFactory
         {
         public:
@@ -142,17 +152,20 @@ namespace rpc
 
         
 
+        // 管理所有注册的 RPC 服务
         class ServiceManager
         {
         public:
             using ptr = std::shared_ptr<ServiceManager>;
-
+            
+            // 注册服务
             void insert(const ServiceDescribe::ptr &desc)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
                 _services.insert(std::make_pair(desc->method(), desc));
             }
 
+            // 根据函数名查找服务
             // ServiceDescribe::ptr create();
             ServiceDescribe::ptr select(const std::string &method_name)
             {
@@ -166,6 +179,7 @@ namespace rpc
                 return it->second;
             }
 
+            // 删除注册
             void remove(const std::string &method_name)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -175,6 +189,8 @@ namespace rpc
         private:
             std::mutex _mutex;
             std::unordered_map<std::string, ServiceDescribe::ptr> _services;
+            // 用函数名映射函数的完整信息，举个例子：
+            // key:add 映射 val:int add(int a,int b);
         };
 
 
@@ -190,9 +206,10 @@ namespace rpc
                 
             }
 
+            // 处理客户端的rpc请求
             void onRpcRequest(const BaseConnection::ptr &conn, RpcRequest::ptr &request)
             {
-                // 1.查询客户端请求方法的描述，判断当前服务端能否提供对应的服务
+                // 1.查询客户端请求方法的描述，判断当前服务端能否提供对应的服务（根据函数名找服务）
                 auto service = _service_manager->select(request->method());
                 if(service.get() == nullptr)
                 {
@@ -212,7 +229,7 @@ namespace rpc
                 bool ret = service->call(request->params(), result);
                 if(ret == false)
                 {
-                    ELOG("%s 服务参数校验失败！", request->method().c_str());
+                    ELOG("%s 服务回调处理失败！", request->method().c_str());
                     return response(conn, request, Json::Value(), RCode::RCODE_INTERNAL_ERROR);
                 }
 
@@ -226,6 +243,7 @@ namespace rpc
             }
 
         private:
+            // 统一构造响应再发送
             void response(const BaseConnection::ptr &conn, const RpcRequest::ptr &req, const Json::Value &res, RCode rcode)
             {
                 auto msg = MessageFactory::create<RpcResponse>();
@@ -237,7 +255,7 @@ namespace rpc
             }
 
         private:
-            ServiceManager::ptr _service_manager;
+            ServiceManager::ptr _service_manager;   // 服务注册表
         };
     }
 }

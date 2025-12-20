@@ -1,3 +1,6 @@
+/*
+    rpc客户端调用：同步/异步/回调
+*/
 #pragma once
 #include "requestor.hpp"
 
@@ -19,6 +22,7 @@ namespace rpc
                 
             }
 
+            // 同步：阻塞等待
             bool call(const BaseConnection::ptr &conn, const std::string &method, const Json::Value &params, Json::Value &result)
             {
                 DLOG("开始同步rpc调用！");
@@ -58,6 +62,7 @@ namespace rpc
                 return true;
             }
 
+            // 异步
             bool call(const BaseConnection::ptr &conn, const std::string &method, const Json::Value &params, std::future<Json::Value> &result)
             {
                 auto req_msg = MessageFactory::create<RpcRequest>();
@@ -72,13 +77,14 @@ namespace rpc
                 bool ret = _requestor->send(conn, std::dynamic_pointer_cast<BaseMessage>(req_msg), cb);
                 if(ret == false)
                 {
-                    ELOG("同步Rpc请求失败！");
+                    ELOG("异步Rpc请求失败！");
                     return false;
                 }
 
                 return true;
             }
 
+            // 回调
             bool call(const BaseConnection::ptr &conn, const std::string &method, const Json::Value &params, const JsonResponseCallback &cb)
             {
                 auto req_msg = MessageFactory::create<RpcRequest>();
@@ -99,6 +105,7 @@ namespace rpc
             }
 
         private:
+            // 回调调用的回调
             void Callback1(const JsonResponseCallback &cb, const BaseMessage::ptr &msg)
             {
                 auto rpc_rsp_msg = std::dynamic_pointer_cast<RpcResponse>(msg);
@@ -119,6 +126,7 @@ namespace rpc
                 cb(rpc_rsp_msg->result());
             }
 
+            // 异步调用回调
             void Callback(std::shared_ptr<std::promise<Json::Value>> result, const BaseMessage::ptr &msg)
             {
                 auto rpc_rsp_msg = std::dynamic_pointer_cast<RpcResponse>(msg);
@@ -156,7 +164,7 @@ namespace rpc
             }
 
         private:
-            Requestor::ptr _requestor;
+            Requestor::ptr _requestor;  // 发送消息到服务器
         };
     }
 }

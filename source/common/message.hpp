@@ -1,4 +1,6 @@
-
+/*
+    核心的消息结构实现
+*/
 #pragma once
 #include "detail.hpp"
 #include "fields.hpp"
@@ -6,8 +8,9 @@
 
 namespace rpc
 {
-    typedef std::pair<std::string, int> Address;
+    typedef std::pair<std::string, int> Address;    // 主机地址：iP + port
 
+    // 直接使用jsoncpp实现序列化和反序列化
     class JsonMessage : public BaseMessage
     {
     public:
@@ -31,8 +34,9 @@ namespace rpc
         }
 
     protected:
-        Json::Value _body;
+        Json::Value _body;  // 消息的内容（json格式）
     };
+
 
 
     class JsonRequest : public JsonMessage
@@ -40,6 +44,7 @@ namespace rpc
     public:
         using ptr = std::shared_ptr<JsonRequest>;
     };
+
 
 
     class JsonResponse : public JsonMessage
@@ -76,6 +81,8 @@ namespace rpc
     };
 
 
+
+    // rpc的请求，需要检查函数名和参数，包含4个方法：分别获取和设置函数名、参数
     class RpcRequest : public JsonRequest
     {
     public:
@@ -121,6 +128,9 @@ namespace rpc
     };
 
 
+
+    // 主题的请求，需要检查主题的名称、操作、消息，包含6个操作：设置、获取主题的名字、操作、消息
+    // 其中主题的操作包含创建、删除、订阅、取消订阅、发布5个操作
     class TopicRequest : public JsonRequest
     {
     public:
@@ -182,6 +192,9 @@ namespace rpc
     };
 
 
+
+    // 向注册中心发送的请求，需要进行检查服务的函数名/方法名、操作类型、主机地址
+    // 6个方法分别是获取和设置函数名、操作类型、主机，其中操作类型有：服务的发现、注册、上线、下线、未知
     class ServiceRequest : public JsonRequest
     {
     public:
@@ -255,6 +268,7 @@ namespace rpc
 
 
 
+    // rpc给客户端的响应/答复，需要检查响应状态码和结果（必须要有结果，结果类型随便），2个方法：设置和获取结果
     class RpcResponse : public JsonResponse
     {
     public:
@@ -288,6 +302,8 @@ namespace rpc
         }
     };
 
+
+
     class TopicResponse : public JsonResponse
     {
     public:
@@ -295,6 +311,10 @@ namespace rpc
 
     };
 
+
+
+    // 注册中心的响应/答复，检查响应状态码、操作类型、主机的信息，6个函数分别是获取和设置状态码、操作类型、主机信息
+    // 其中操作类型还是服务的注册、发现、上下线、未知
     class ServiceResponse : public JsonResponse
     {
     public:
@@ -375,7 +395,8 @@ namespace rpc
     };
 
 
-    // 实现一个消息对象的生产工厂
+
+    // 实现一个消息对象的生产工厂，会根据消息类型生成对应对象
     class MessageFactory
     {
     public:

@@ -19,6 +19,7 @@
 
 namespace rpc
 {
+    // 网络缓冲区的具体实现
     class MuduoBuffer : public BaseBuffer
     {
     public:
@@ -53,7 +54,7 @@ namespace rpc
         }
 
     private:
-        muduo::net::Buffer *_buf;
+        muduo::net::Buffer *_buf; // 指向muduo库Buffer对象的指针（真正的网络缓冲区）
     };
 
     class BufferFactory
@@ -68,6 +69,7 @@ namespace rpc
 
 
 
+    // 消息格式：4字节总长度 4字节消息类型 4字节ID长度 不定长ID 不定长消息体 
     class LVProtocol : public BaseProtocol
     {
     public:
@@ -119,7 +121,7 @@ namespace rpc
             return result;
         }
 
-        // 判断缓冲区中的数据量是否足够一条消息的处理
+        // 判断缓冲区中的数据量是否足够一条消息的处理，不够就等
         virtual bool canProcessed(const BaseBuffer::ptr &buf) override
         {
             if(buf->readableSize() < lenFieldsLength)
@@ -138,9 +140,9 @@ namespace rpc
         }
 
     private:
-        const size_t lenFieldsLength = 4;
-        const size_t mtypeFieldsLength = 4;
-        const size_t idlenFieldsLength = 4;
+        const size_t lenFieldsLength = 4;       // 总长度
+        const size_t mtypeFieldsLength = 4;     // 消息类型
+        const size_t idlenFieldsLength = 4;     // ID长度
     };
 
     class ProtocolFactory
@@ -155,6 +157,7 @@ namespace rpc
 
 
 
+    // 对muduo::net::TcpConnection做简单的封装
     class MuduoConnection : public BaseConnection
     {
     public:
@@ -173,11 +176,13 @@ namespace rpc
             _conn->send(body);
         }
 
+        // 关闭连接
         virtual void shutdown() override
         {
             _conn->shutdown();
         }
 
+        // 检查连接状态
         virtual bool connected() override
         {
             return _conn->connected();
@@ -200,6 +205,7 @@ namespace rpc
 
 
 
+    // rpc服务器
     class MuduoServer : public BaseServer
     {
     public:
@@ -311,12 +317,12 @@ namespace rpc
         }
 
     private:
-        const size_t maxDataSize = (1 << 16);
-        BaseProtocol::ptr _protocol;
-        muduo::net::EventLoop _baseloop;
-        muduo::net::TcpServer _server;
-        std::mutex _mutex;
-        std::unordered_map<muduo::net::TcpConnectionPtr, BaseConnection::ptr> _conns;
+        const size_t maxDataSize = (1 << 16);                                         // 缓冲区的最大值
+        BaseProtocol::ptr _protocol;                                                  // 负责消息的打包和解包
+        muduo::net::EventLoop _baseloop;                                              // Muduo循环，服务器持续运行
+        muduo::net::TcpServer _server;                                                // 网络通信（muduo的TCP）
+        std::mutex _mutex;                                                            // 互斥锁
+        std::unordered_map<muduo::net::TcpConnectionPtr, BaseConnection::ptr> _conns; // key：tcp,val：连接对象
     };
 
     class ServerFactory
@@ -329,6 +335,9 @@ namespace rpc
         }
     };
 
+
+
+    // rpc客户端
     class MuduoClient : public BaseClient
     {
     public:
@@ -442,13 +451,13 @@ namespace rpc
         }
 
     private:
-        const size_t maxDataSize = (1 << 16);
+        const size_t maxDataSize = (1 << 16); // 64K的最大缓冲区
         muduo::net::EventLoopThread _loopthread;
         muduo::net::EventLoop *_baseloop;
         muduo::CountDownLatch _downlatch;
         BaseProtocol::ptr _protocol;
         BaseConnection::ptr _conn;
-        muduo::net::TcpClient _client;
+        muduo::net::TcpClient _client; // muduo的tcp客户端
     };
 
     class ClientFactory

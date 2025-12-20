@@ -1,3 +1,6 @@
+/*
+    处理主题：创建、删除、订阅、取消订阅、发布
+*/
 #pragma once
 #include "../common/net.hpp"
 #include "../common/message.hpp"
@@ -8,6 +11,7 @@ namespace rpc
 {
     namespace server
     {
+        // 管理主题
         class TopicManager
         {
         public:
@@ -17,6 +21,7 @@ namespace rpc
             {
             }
 
+            // 处理主题请求
             void onTopicRequest(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 TopicOptype topic_optype = msg->optype();
@@ -51,6 +56,7 @@ namespace rpc
                 return topicResponse(conn, msg);
             }
 
+            // 处理连接关闭
             void onShutdown(const BaseConnection::ptr &conn)
             {
                 std::vector<Topic::ptr> topics;
@@ -86,6 +92,7 @@ namespace rpc
             }
 
         private:
+            // 返回错误响应
             void errorResponse(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg, RCode rcode)
             {
                 auto msg_rsp = MessageFactory::create<TopicResponse>();
@@ -95,6 +102,7 @@ namespace rpc
                 conn->send(msg_rsp);
             }
 
+            // 返回成功响应
             void topicResponse(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 auto msg_rsp = MessageFactory::create<TopicResponse>();
@@ -104,6 +112,7 @@ namespace rpc
                 conn->send(msg_rsp);
             }
 
+            // 创建主题
             void topicCreate(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -113,6 +122,7 @@ namespace rpc
                 _topics.insert(std::make_pair(topic_name, topic));
             }
 
+            // 删除主题
             void topicRemove(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 std::string topic_name = msg->topicKey();
@@ -137,6 +147,7 @@ namespace rpc
                 }
             }
 
+            // 订阅主题
             bool topicSubscribe(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 Topic::ptr topic;
@@ -168,6 +179,7 @@ namespace rpc
                 return true;
             }
 
+            // 取消订阅主题
             void topicCancel(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 Topic::ptr topic;
@@ -199,6 +211,7 @@ namespace rpc
                 }
             }
 
+            // 发布消息
             bool topicPublish(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 Topic::ptr topic;
@@ -223,7 +236,7 @@ namespace rpc
             {
                 using ptr = std::shared_ptr<Subscriber>;
                 std::mutex _mutex;
-                BaseConnection::ptr conn;
+                BaseConnection::ptr conn;               // 存储订阅者连接对象
                 std::unordered_set<std::string> topics; // 订阅者订阅的主题名称
 
                 Subscriber(const BaseConnection::ptr &c)
@@ -231,14 +244,14 @@ namespace rpc
                 {
                 }
 
-                // 订阅主题的时候调用
+                // 订阅主题的时候调用，将主题添加到订阅者列表中
                 void appendTopic(const std::string &topic_name)
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     topics.insert(topic_name);
                 }
 
-                // 主题被删除或者取消订阅的时候调用
+                // 主题被删除或者取消订阅的时候调用，从订阅者的订阅列表中移除主题
                 void removeTopic(const std::string &topic_name)
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
@@ -250,7 +263,7 @@ namespace rpc
             {
                 using ptr = std::shared_ptr<Topic>;
                 std::mutex _mutex;
-                std::string topic_name;
+                std::string topic_name;                          // 主题名字
                 std::unordered_set<Subscriber::ptr> subscribers; // 当前主题的订阅者
 
                 Topic(const std::string &name)
@@ -258,21 +271,21 @@ namespace rpc
                 {
                 }
 
-                // 新增订阅的时候进行调用
+                // 添加订阅者：新增订阅的时候进行调用
                 void appendSubscriber(const Subscriber::ptr &subscriber)
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     subscribers.insert(subscriber);
                 }
 
-                // 取消订阅或者订阅者连接断开的时候调用
+                // 移除订阅者：取消订阅或者订阅者连接断开的时候调用
                 void removeSubscriber(const Subscriber::ptr &subscriber)
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     subscribers.erase(subscriber);
                 }
 
-                // 收到消息发布请求的时候调用
+                // 发布消息：收到消息发布请求的时候调用
                 void pushMessage(const BaseMessage::ptr &msg)
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
@@ -285,8 +298,8 @@ namespace rpc
 
         private:
             std::mutex _mutex;
-            std::unordered_map<std::string, Topic::ptr> _topics;
-            std::unordered_map<BaseConnection::ptr, Subscriber::ptr> _subscribers;
+            std::unordered_map<std::string, Topic::ptr> _topics;                   // key：主题名称，val：主题对象
+            std::unordered_map<BaseConnection::ptr, Subscriber::ptr> _subscribers; // key：连接（客户端），val：订阅者对象
         };
     }
 }

@@ -1,5 +1,5 @@
 /*
-    前置枚举类型的实现/定义
+    前置枚举类型（字段）的实现/定义
 */
 #pragma once
 #include <string>
@@ -19,7 +19,7 @@ namespace rpc
     #define KEY_RCODE       "rcode"        // 返回/响应码（表示RPC调用状态）
     #define KEY_RESULT      "result"       // 返回/调用结果（RPC响应内容）
 
-    // 消息类型定义
+    // 消息类型定义（用于消息格式第二个：4字节消息类型）
     enum class MType
     {
         REQ_RPC = 0, // RPC请求消息（客户端请求调用远程方法）

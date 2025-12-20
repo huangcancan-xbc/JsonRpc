@@ -1,3 +1,8 @@
+/*
+    管理rpc请求的发送和处理
+    * 同步、异步、回调请求
+    * rid映射rpc请求的完整对象
+*/
 #pragma once
 #include "../common/net.hpp"
 #include "../common/message.hpp"
@@ -8,6 +13,7 @@ namespace rpc
 {
     namespace client
     {
+        // rpc请求
         class Requestor
         {
         public:
@@ -18,8 +24,9 @@ namespace rpc
             struct RequestDescribe
             {
                 using ptr = std::shared_ptr<RequestDescribe>;
-                BaseMessage::ptr request;                // 请求对象
-                RType rtype;                             // 请求类型
+
+                BaseMessage::ptr request;                // 请求消息的对象
+                RType rtype;                             // 请求类型（同步/异步/回调）
                 std::promise<BaseMessage::ptr> response; // 用于异步返回
                 RequestCallback callback;                // 回调函数
             };
@@ -53,6 +60,7 @@ namespace rpc
                 delDescribe(rid);
             }
 
+            // 异步请求
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, AsyncResponse &async_rsp)
             {
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_ASYNC);
@@ -67,6 +75,7 @@ namespace rpc
                 return true;
             }
 
+            // 同步请求
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, BaseMessage::ptr &rsp)
             {
                 AsyncResponse rsp_future;
@@ -76,10 +85,11 @@ namespace rpc
                     return false;
                 }
 
-                rsp = rsp_future.get();
+                rsp = rsp_future.get(); // 阻塞等待响应
                 return true;
             }
 
+            // 回调请求
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, RequestCallback &cb)
             {
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_CALLBACK, cb);
@@ -112,6 +122,7 @@ namespace rpc
                 return rd;
             }
 
+            // 根据rid找对应的请求描述
             RequestDescribe::ptr getDescribe(const std::string &rid)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -124,6 +135,7 @@ namespace rpc
                 return it->second;
             }
 
+            // 删除已经处理完了的请求描述
             void delDescribe(const std::string &rid)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -132,6 +144,17 @@ namespace rpc
 
         private:
             std::mutex _mutex;
+
+            // key：rid，val：请求描述对象，请求描述对象有点复杂，还是直接看示例吧：
+            // rid: "12345" → RequestDescribe {
+            //   request: {
+            //     method: "add",
+            //     params: {a: 11, b:22}
+            //   },
+            //   rtype: 异步/同步/回调,
+            //   promise: 等待响应的容器,
+            //   callback: 可选的回调函数
+            // }
             std::unordered_map<std::string, RequestDescribe::ptr> _request_desc;
         };
     }

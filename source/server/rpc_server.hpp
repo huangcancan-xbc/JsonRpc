@@ -1,3 +1,8 @@
+/*
+    注册中心服务器：注册、发现和管理
+    rpc服务提供：注册执行rpc、连接注册中心、处理客户端rpc请求、
+    主题服务器：管理主题（创建、删除）、处理客户端（订阅、取消订阅）、广播订阅者
+*/
 #pragma once
 #include "../common/dispatcher.hpp"
 #include "../client/rpc_client.hpp"
@@ -10,7 +15,7 @@ namespace rpc
 {
     namespace server
     {
-        // 注册中心服务端：只需要针对服务注册与发现请求进行处理
+        // 注册中心服务端：针对服务注册与发现请求进行处理
         class RegistryServer
         {
         public:
@@ -43,13 +48,14 @@ namespace rpc
             }
 
         private:
-            PDManager::ptr _pd_manager;
-            Dispatcher::ptr _dispatcher;
-            BaseServer::ptr _server;
+            PDManager::ptr _pd_manager;  // 对提供者和发现者的管理
+            Dispatcher::ptr _dispatcher; // 消息的分发
+            BaseServer::ptr _server;     // 服务器实例
         };
 
 
 
+        // 提供rpc服务
         class RpcServer
         {
         public:
@@ -76,6 +82,7 @@ namespace rpc
                 _server->setMessageCallback(message_cb);
             }
 
+            // 决定注册中心注册与否
             void registerMethod(const ServiceDescribe::ptr &service)
             {
                 if (_enableRegistry)
@@ -92,16 +99,17 @@ namespace rpc
             }
 
         private:
-            bool _enableRegistry;
-            Address _access_addr;
-            client::RegistryClient::ptr _reg_client;
-            RpcRouter::ptr _router;
-            Dispatcher::ptr _dispatcher;
-            BaseServer::ptr _server;
+            bool _enableRegistry;                    // 是否使用注册中心
+            Address _access_addr;                    // 服务器主机信息
+            client::RegistryClient::ptr _reg_client; // 服务的注册
+            RpcRouter::ptr _router;                  // 根据请求找到对应的服务
+            Dispatcher::ptr _dispatcher;             // 分发消息
+            BaseServer::ptr _server;                 // 服务器
         };
 
 
 
+        // 处理/管理主题
         class TopicServer
         {
         public:
@@ -134,9 +142,9 @@ namespace rpc
             }
 
         private:
-            TopicManager::ptr _topic_manager;
-            Dispatcher::ptr _dispatcher;
-            BaseServer::ptr _server;
+            TopicManager::ptr _topic_manager; // 主题管理：创建、删除、订阅等
+            Dispatcher::ptr _dispatcher;      // 分发消息
+            BaseServer::ptr _server;          // 服务器
         };
     }
 }

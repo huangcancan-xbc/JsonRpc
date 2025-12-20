@@ -1,3 +1,8 @@
+/*
+    服务提供者：向注册中心注册服务
+    服务-主机管理：同一服务可能存在多个提供者（负载均衡）
+    服务发现者：从注册中心发现服务并管理服务提供者
+*/
 #pragma once
 #include "requestor.hpp"
 
@@ -6,6 +11,7 @@ namespace rpc
 {
     namespace client
     {
+        // 注册服务提供者到注册中心，并报告自己提供的服务和主机信息
         class Provider
         {
         public:
@@ -17,6 +23,7 @@ namespace rpc
                 
             }
 
+            // 向注册中心注册某个服务，该服务由……主机提供
             bool registryMethod(const BaseConnection::ptr &conn, const std::string &method, const Address &host)
             {
                 auto msg_req = MessageFactory::create<ServiceRequest>();
@@ -51,11 +58,12 @@ namespace rpc
             }
 
         private:
-            Requestor::ptr _requestor;
+            Requestor::ptr _requestor; // 用于发送请求、接收响应
         };
 
 
 
+        // 将rpc方法对应多个提供服务的主机进行管理
         class MethodHost
         {
         public:
@@ -74,6 +82,7 @@ namespace rpc
                 
             }
 
+            // 添加一个主机信息（服务上线）
             void appendHost(const Address &host)
             {
                 // 中途收到服务上线请求后被调用
@@ -81,6 +90,7 @@ namespace rpc
                 _hosts.push_back(host);
             }
 
+            // 删除一个主机信息（服务下线）
             void removeHost(const Address &host)
             {
                 // 中途收到服务下线请求后被调用
@@ -98,10 +108,20 @@ namespace rpc
             Address chooseHost()
             {
                 std::unique_lock<std::mutex> lock(_mutex);
+
+                // 我发现如果下面的_hosts.size()返回0就会产生除0错误，所以特地添加一个检查
+                // 即使下面的Discoverer::serviceDiscovery()方法已经检查了empty()
+                // 我也愿意用这一点低成本换来较大的安全性，算是一个小安全优化吧
+                if (_hosts.empty())
+                {
+                    return Address();
+                }
+
                 size_t pos = _idx++ % _hosts.size();
                 return _hosts[pos];
             }
 
+            // 看看是否有可用的主机
             bool empty()
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -110,12 +130,13 @@ namespace rpc
 
         private:
             std::mutex _mutex;
-            size_t _idx;
-            std::vector<Address> _hosts;
+            size_t _idx;                 // 轮询的下标索引
+            std::vector<Address> _hosts; // 主机信息数组/列表
         };
 
         
 
+        // 客户端服务发现、上下线通知的管理
         class Discoverer
         {
         public:
@@ -129,6 +150,7 @@ namespace rpc
                 
             }
 
+            // 服务发现，如果本地已经有主机列表就直接返回，反之就发起请求，请求注册中心提供主机列表
             bool serviceDiscovery(const BaseConnection::ptr &conn, const std::string &method, Address &host)
             {
                 {
@@ -145,7 +167,7 @@ namespace rpc
                     }
                 }
 
-                // 当前服务的提供者为空
+                // 当前服务的提供者为空，发起SERVICE_DISCOVERY请求
                 auto msg_req = MessageFactory::create<ServiceRequest>();
                 msg_req->setId(UUID::uuid());
                 msg_req->setMType(MType::REQ_SERVICE);
@@ -186,7 +208,7 @@ namespace rpc
                 return true;
             }
 
-            // 这个接口是提供给Dispatcher模块进行服务上线下线请求处理的回调函数
+            // 这个接口是提供给Dispatcher模块进行服务上线下线请求处理的回调函数（收到SERVICE_ONLINE/SERVICE_OFFLINE时调用）
             void onServiceRequest(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
             {
                 // 1. 判断是上线还是下线请求，如果都不是那就不用处理了
@@ -210,7 +232,7 @@ namespace rpc
                 }
                 else if (optype == ServiceOptype::SERVICE_OFFLINE)
                 {
-                    // 3. 下线请求：找到MethodHost，从其中删除一个主机地址
+                    // 3. 下线请求：找到MethodHost，从其中删除一个主机地址，并触发下线回调
                     auto it = _method_hosts.find(method);
                     if (it == _method_hosts.end())
                     {
@@ -222,10 +244,10 @@ namespace rpc
             }
 
         private:
-            OfflineCallback _offline_callback;
+            OfflineCallback _offline_callback; // 当主机下线要进行通知
             std::mutex _mutex;
-            std::unordered_map<std::string, MethodHost::ptr> _method_hosts;
-            Requestor::ptr _requestor;
+            std::unordered_map<std::string, MethodHost::ptr> _method_hosts; // key：服务，val：主机列表
+            Requestor::ptr _requestor;                                      // 用于发送服务发现请求
         };
     }
 }

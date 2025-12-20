@@ -1,3 +1,6 @@
+/*
+    主题请求：创建、删除、订阅、取消订阅、发布
+*/
 #pragma once
 #include "requestor.hpp"
 #include <unordered_set>
@@ -7,6 +10,7 @@ namespace rpc
 {
     namespace client
     {
+        // 主题管理
         class TopicManager
         {
         public:
@@ -79,18 +83,21 @@ namespace rpc
             }
 
         private:
+            // 添加订阅
             void addSubscribe(const std::string &key, const SubCallback &cb)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
                 _topic_callbacks.insert(std::make_pair(key, cb));
             }
 
+            // 删除订阅
             void delSubscribe(const std::string &key)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
                 _topic_callbacks.erase(key);
             }
 
+            // 获取订阅回调
             const SubCallback getSubscribe(const std::string &key)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -103,6 +110,7 @@ namespace rpc
                 return it->second;
             }
 
+            // 发送请求：目标服务器连接对象、主题名称、主题操作、消息
             bool commonRequest(const BaseConnection::ptr &conn, const std::string &key, TopicOptype type, const std::string &msg = "")
             {
                 // 1. 构造请求对象，并填充数据
@@ -144,8 +152,8 @@ namespace rpc
 
         private:
             std::mutex _mutex;
-            std::unordered_map<std::string, SubCallback> _topic_callbacks;
-            Requestor::ptr _requestor;
+            std::unordered_map<std::string, SubCallback> _topic_callbacks; // key：主题，val：对应回调
+            Requestor::ptr _requestor;                                     // rpc远端服务通信
         };
     }
 }

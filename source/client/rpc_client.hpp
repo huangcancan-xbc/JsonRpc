@@ -1,3 +1,9 @@
+/*
+    服务注册客户端：向注册中心注册服务，告诉注册中心能提供什么样的服务、主机信息
+    服务发现客户端：从注册中心发现服务，客户端需要服务时，会先问注册中心该服务在哪，谁能提供
+    rpc调用客户端：发起rpc调用（同步/异步/回调）
+    主题客户端：创建、删除、发布、订阅、取消订阅
+*/
 #pragma once
 #include "../common/dispatcher.hpp"
 #include "requestor.hpp"
@@ -10,6 +16,7 @@ namespace rpc
 {
     namespace client
     {
+        // 连接注册中心和注册服务
         class RegistryClient
         {
         public:
@@ -43,14 +50,15 @@ namespace rpc
             // client::Provider::ptr _provider;
             // Requestor::ptr _requestor;
 
-            Requestor::ptr _requestor;
-            client::Provider::ptr _provider;
-            Dispatcher::ptr _dispatcher;
-            BaseClient::ptr _client;
+            Requestor::ptr _requestor;       // rpc请求发送和响应接收
+            client::Provider::ptr _provider; // 注册中心注册
+            Dispatcher::ptr _dispatcher;     // 注册中心响应
+            BaseClient::ptr _client;         // rpc客户端（与注册中心建立连接）
         };
 
 
 
+        // 服务发现
         class DiscoveryClient
         {
         public:
@@ -75,21 +83,22 @@ namespace rpc
                 _client->connect();
             }
 
-            // 向外提供的接口
+            // 查询服务提供者的相关信息
             bool serviceDiscovery(const std::string &method, Address &host)
             {
                 return _discoverer->serviceDiscovery(_client->connection(), method, host);
             }
 
         private:
-            Requestor::ptr _requestor;
-            client::Discoverer::ptr _discoverer;
-            Dispatcher::ptr _dispatcher;
-            BaseClient::ptr _client;
+            Requestor::ptr _requestor;           // rpc请求发送和响应接收
+            client::Discoverer::ptr _discoverer; // 从注册中心查询服务的提供者
+            Dispatcher::ptr _dispatcher;         // 处理注册中心和服务提供者的响应
+            BaseClient::ptr _client;             // rpc客户端（与注册中心建立连接）
         };
 
 
 
+        // 客户端发起rpc请求
         class RpcClient
         {
         public:
@@ -231,19 +240,22 @@ namespace rpc
                     return std::hash<std::string>{}(addr);
                 }
             };
-            
-            bool _enableDiscovery;
-            DiscoveryClient::ptr _discovery_client;
-            Requestor::ptr _requestor;
-            RpcCaller::ptr _caller;
-            Dispatcher::ptr _dispatcher;
-            BaseClient::ptr _rpc_client;
+
+            bool _enableDiscovery;                  // 是否启用服务发现
+            DiscoveryClient::ptr _discovery_client; // 用于服务发现的客户端
+            Requestor::ptr _requestor;              // RPC请求发送和响应接收
+            RpcCaller::ptr _caller;                 // 发起rpc调用
+            Dispatcher::ptr _dispatcher;            // 分发响应消息
+            BaseClient::ptr _rpc_client;            // 和服务提供者通信的客户端
             std::mutex _mutex;
+
+            // 已连接rpc客户端的表，key：主机地址信息，val：rpc客户端
             std::unordered_map<Address, BaseClient::ptr, AddressHash> _rpc_clients;
         };
 
 
 
+        // rpc主题功能：创建、发布、订阅、删除
         class TopicClient
         {
         public:
@@ -275,11 +287,13 @@ namespace rpc
                 return _topic_manager->remove(_rpc_client->connection(), key);
             }
 
+            // 订阅主题
             bool subscribe(const std::string &key, const TopicManager::SubCallback &cb)
             {
                 return _topic_manager->subscribe(_rpc_client->connection(), key, cb);
             }
 
+            // 取消订阅
             bool cancel(const std::string &key)
             {
                 return _topic_manager->cancel(_rpc_client->connection(), key);
@@ -290,16 +304,17 @@ namespace rpc
                 return _topic_manager->publish(_rpc_client->connection(), key, msg);
             }
 
+            // 关闭rpc客户端
             void shutdown()
             {
                 _rpc_client->shutdown();
             }
 
         private:
-            Requestor::ptr _requestor;
-            TopicManager::ptr _topic_manager;
-            Dispatcher::ptr _dispatcher;
-            BaseClient::ptr _rpc_client;
+            Requestor::ptr _requestor;        // rpc请求发送和响应接收
+            TopicManager::ptr _topic_manager; // 处理主题（创建、订阅、发布、删除）
+            Dispatcher::ptr _dispatcher;      // 处理主题的响应
+            BaseClient::ptr _rpc_client;      // rpc客户端（与服务提供者通信）
         };
     }
 }
