@@ -63,6 +63,12 @@ namespace rpc
             // 异步请求
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, AsyncResponse &async_rsp)
             {
+                if (!conn || conn->connected() == false)
+                {
+                    ELOG("发送失败：连接不可用！");
+                    return false;
+                }
+
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_ASYNC);
                 if(rdp.get() == nullptr)
                 {
@@ -85,13 +91,29 @@ namespace rpc
                     return false;
                 }
 
-                rsp = rsp_future.get(); // 阻塞等待响应
+                // 同步请求增加超时，避免连接断开/响应丢失时无限阻塞
+                // 超时时间保持较短，避免上层多次重试时累积成明显卡顿
+                auto status = rsp_future.wait_for(std::chrono::seconds(1));
+                if (status != std::future_status::ready)
+                {
+                    ELOG("同步请求等待响应超时: %s", req->rid().c_str());
+                    delDescribe(req->rid());
+                    return false;
+                }
+
+                rsp = rsp_future.get();
                 return true;
             }
 
             // 回调请求
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, RequestCallback &cb)
             {
+                if (!conn || conn->connected() == false)
+                {
+                    ELOG("发送失败：连接不可用！");
+                    return false;
+                }
+
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_CALLBACK, cb);
                 if(rdp.get() == nullptr)
                 {

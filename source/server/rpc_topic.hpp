@@ -5,6 +5,7 @@
 #include "../common/net.hpp"
 #include "../common/message.hpp"
 #include <unordered_set>
+#include <vector>
 
 
 namespace rpc
@@ -33,13 +34,14 @@ namespace rpc
                     topicCreate(conn, msg);
                     break;
                 case TopicOptype::TOPIC_REMOVE:
-                    topicRemove(conn, msg);
+                    ret = topicRemove(conn, msg);
                     break;
                 case TopicOptype::TOPIC_SUBSCRIBE:
-                    topicSubscribe(conn, msg);
+                    // 订阅失败（例如主题不存在）需要反馈给上层，不能吞掉返回值
+                    ret = topicSubscribe(conn, msg);
                     break;
                 case TopicOptype::TOPIC_CANCEL:
-                    topicCancel(conn, msg);
+                    ret = topicCancel(conn, msg);
                     break;
                 case TopicOptype::TOPIC_PUBLISH:
                     ret = topicPublish(conn, msg);
@@ -71,7 +73,9 @@ namespace rpc
                     }
 
                     subscriber = it->second;
-                    for (auto &topic_name : subscriber->topics)
+                    // 先拿订阅列表快照，避免无锁遍历 Subscriber::topics 产生并发竞态
+                    auto topic_names = subscriber->listTopics();
+                    for (auto &topic_name : topic_names)
                     {
                         auto topic_it = _topics.find(topic_name);
                         if (topic_it == _topics.end())
@@ -123,7 +127,7 @@ namespace rpc
             }
 
             // 删除主题
-            void topicRemove(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
+            bool topicRemove(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 std::string topic_name = msg->topicKey();
                 std::unordered_set<Subscriber::ptr> subscribers;
@@ -134,10 +138,12 @@ namespace rpc
                     auto it = _topics.find(topic_name);
                     if (it == _topics.end())
                     {
-                        return;
+                        // 保持与发布/订阅一致：主题不存在时返回失败
+                        return false;
                     }
 
-                    subscribers = it->second->subscribers;
+                    // 先拿订阅者快照，避免无锁读取 Topic::subscribers 产生并发竞态
+                    subscribers = it->second->listSubscribers();
                     _topics.erase(it);
                 }
 
@@ -145,6 +151,8 @@ namespace rpc
                 {
                     subscriber->removeTopic(topic_name);
                 }
+
+                return true;
             }
 
             // 订阅主题
@@ -180,7 +188,7 @@ namespace rpc
             }
 
             // 取消订阅主题
-            void topicCancel(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
+            bool topicCancel(const BaseConnection::ptr &conn, const TopicRequest::ptr &msg)
             {
                 Topic::ptr topic;
                 Subscriber::ptr subscriber;
@@ -188,27 +196,27 @@ namespace rpc
                 {
                     std::unique_lock<std::mutex> lock(_mutex);
                     auto topic_it = _topics.find(msg->topicKey());
-                    if (topic_it != _topics.end())
+                    if (topic_it == _topics.end())
                     {
-                        topic = topic_it->second;
+                        return false;
                     }
+                    topic = topic_it->second;
 
                     auto sub_it = _subscribers.find(conn);
                     if (sub_it != _subscribers.end())
                     {
                         subscriber = sub_it->second;
                     }
+                    else
+                    {
+                        // 连接不存在订阅者信息时，同样返回失败，避免误报成功
+                        return false;
+                    }
                 }
 
-                if (subscriber)
-                {
-                    subscriber->removeTopic(msg->topicKey());
-                }
-
-                if (topic && subscriber)
-                {
-                    topic->removeSubscriber(subscriber);
-                }
+                subscriber->removeTopic(msg->topicKey());
+                topic->removeSubscriber(subscriber);
+                return true;
             }
 
             // 发布消息
@@ -257,6 +265,13 @@ namespace rpc
                     std::unique_lock<std::mutex> lock(_mutex);
                     topics.erase(topic_name);
                 }
+
+                // 返回订阅主题快照，供外部安全遍历
+                std::vector<std::string> listTopics()
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    return std::vector<std::string>(topics.begin(), topics.end());
+                }
             };
 
             struct Topic
@@ -293,6 +308,13 @@ namespace rpc
                     {
                         subscriber->conn->send(msg);
                     }
+                }
+
+                // 返回订阅者快照，供外部安全遍历
+                std::unordered_set<Subscriber::ptr> listSubscribers()
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    return subscribers;
                 }
             };
 

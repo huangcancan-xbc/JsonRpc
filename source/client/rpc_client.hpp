@@ -177,6 +177,35 @@ namespace rpc
                 return client;
             }
 
+            // 并发下安全地获取或创建连接
+            BaseClient::ptr getOrCreateClient(const Address &host)
+            {
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto it = _rpc_clients.find(host);
+                    if (it != _rpc_clients.end())
+                    {
+                        return it->second;
+                    }
+                }
+
+                auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), std::placeholders::_1, std::placeholders::_2);
+                auto client = ClientFactory::create(host.first, host.second);
+                client->setMessageCallback(message_cb);
+                client->connect();
+
+                std::unique_lock<std::mutex> lock(_mutex);
+                auto ret = _rpc_clients.insert(std::make_pair(host, client));
+                if (ret.second == false)
+                {
+                    // 其他线程已抢先创建，当前临时连接关闭并复用已有连接
+                    client->shutdown();
+                    return ret.first->second;
+                }
+
+                return client;
+            }
+
             BaseClient::ptr getClient(const Address &host)
             {
                 std::unique_lock<std::mutex> lock(_mutex);
@@ -205,11 +234,7 @@ namespace rpc
                     }
 
                     // 2.看看服务提供者是否已存在实例化客户端，有就直接用，没有就创建
-                    client = getClient(host);
-                    if(client.get() == nullptr)
-                    {
-                        client = newClient(host);
-                    }
+                    client = getOrCreateClient(host);
                 }
                 else
                 {

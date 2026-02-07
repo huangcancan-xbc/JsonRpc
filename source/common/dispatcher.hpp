@@ -57,12 +57,20 @@ namespace rpc
 
         void onMessage(const BaseConnection::ptr &conn, BaseMessage::ptr &msg)
         {
-            // 找到消息类型对应的业务处理函数，直接进行调用
-            std::unique_lock<std::mutex> lock(_mutex);
-            auto it = _handlers.find(msg->mtype());
-            if(it != _handlers.end())
+            Callback::ptr handler;
             {
-                return it->second->onMessage(conn, msg);
+                // 只在查表时持锁，避免持锁执行业务回调造成阻塞/死锁风险
+                std::unique_lock<std::mutex> lock(_mutex);
+                auto it = _handlers.find(msg->mtype());
+                if (it != _handlers.end())
+                {
+                    handler = it->second;
+                }
+            }
+
+            if (handler)
+            {
+                return handler->onMessage(conn, msg);
             }
 
             // 没有找到指定类型的处理回调，说明这个消息并不是自己的，属于未知，这里选择直接关闭了

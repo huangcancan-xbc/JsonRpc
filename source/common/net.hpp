@@ -15,6 +15,8 @@
 #include "message.hpp"
 #include <mutex>
 #include <unordered_map>
+#include <thread>
+#include <chrono>
 
 
 namespace rpc
@@ -76,12 +78,47 @@ namespace rpc
         using ptr = std::shared_ptr<BaseProtocol>;
         virtual bool onMessage(const BaseBuffer::ptr &buf, BaseMessage::ptr &msg) override
         {
+            // 防御性检查：至少要有 total_len + mtype + idlen 三个字段
+            if (buf->readableSize() < (lenFieldsLength + mtypeFieldsLength + idlenFieldsLength))
+            {
+                ELOG("消息头长度不足！");
+                return false;
+            }
+
             int32_t total_len = buf->readInt32();  // 读取总长度
             MType mtype = (MType)buf->readInt32(); // 读取数据类型
             int32_t idlen = buf->readInt32();      // 读取id长度
+
+            const int32_t min_total_len = static_cast<int32_t>(mtypeFieldsLength + idlenFieldsLength);
+            // 关键边界检查：防止 idlen/body_len 越界导致崩溃
+            if (total_len < min_total_len || total_len > maxTotalLen)
+            {
+                ELOG("消息总长度非法: %d", total_len);
+                return false;
+            }
+
+            if (idlen < 0 || idlen > (total_len - min_total_len))
+            {
+                ELOG("消息ID长度非法: %d, total_len: %d", idlen, total_len);
+                return false;
+            }
+
             int32_t body_len = total_len - idlen - idlenFieldsLength - mtypeFieldsLength;
-            std::string id = buf->retrieveAsString(idlen);
-            std::string body = buf->retrieveAsString(body_len);
+            if (body_len < 0)
+            {
+                ELOG("消息正文长度非法: %d", body_len);
+                return false;
+            }
+
+            size_t need_read_len = static_cast<size_t>(idlen) + static_cast<size_t>(body_len);
+            if (buf->readableSize() < need_read_len)
+            {
+                ELOG("消息数据不完整，需读取: %zu, 当前可读: %zu", need_read_len, buf->readableSize());
+                return false;
+            }
+
+            std::string id = buf->retrieveAsString(static_cast<size_t>(idlen));
+            std::string body = buf->retrieveAsString(static_cast<size_t>(body_len));
             msg = MessageFactory::create(mtype);
             if (msg.get() == nullptr)
             {
@@ -98,6 +135,13 @@ namespace rpc
 
             msg->setId(id);
             msg->setMType(mtype);
+
+            // 语义校验：字段缺失/类型错误的消息不进入业务层
+            if (msg->check() == false)
+            {
+                ELOG("消息语义校验失败！");
+                return false;
+            }
 
             return true;
         }
@@ -128,10 +172,24 @@ namespace rpc
             {
                 return false;
             }
+
+            // 先确保消息头字段齐全，再判断是否可处理，避免非法帧导致读越界
+            if (buf->readableSize() < (lenFieldsLength + mtypeFieldsLength + idlenFieldsLength))
+            {
+                return false;
+            }
             
             int32_t total_len = buf->peekInt32();
             DLOG("total_len: %d", total_len);
-            if (buf->readableSize() < (total_len + lenFieldsLength))
+            const int32_t min_total_len = static_cast<int32_t>(mtypeFieldsLength + idlenFieldsLength);
+            if (total_len < min_total_len || total_len > maxTotalLen)
+            {
+                // 非法长度，交给 onMessage 返回 false 并由上层断开连接
+                return true;
+            }
+
+            size_t packet_len = static_cast<size_t>(total_len) + lenFieldsLength;
+            if (buf->readableSize() < packet_len)
             {
                 return false;
             }
@@ -143,6 +201,7 @@ namespace rpc
         const size_t lenFieldsLength = 4;       // 总长度
         const size_t mtypeFieldsLength = 4;     // 消息类型
         const size_t idlenFieldsLength = 4;     // ID长度
+        const int32_t maxTotalLen = (1 << 16);  // 与服务端缓冲上限保持一致，避免超大帧
     };
 
     class ProtocolFactory
@@ -362,7 +421,27 @@ namespace rpc
 
             // 连接服务器
             _client.connect();
-            _downlatch.wait();
+            // 之前这里是无限等待，服务不可达时可能会卡死；改成有限等待
+            const int max_wait_ms = 3000;
+            int waited_ms = 0;
+            while (_downlatch.getCount() > 0 && waited_ms < max_wait_ms)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                waited_ms += 10;
+            }
+
+            if (_downlatch.getCount() > 0)
+            {
+                ELOG("连接服务器超时！");
+                return;
+            }
+
+            if (connected() == false)
+            {
+                ELOG("连接服务器失败！");
+                return;
+            }
+
             DLOG("连接服务器成功！");
         }
 
@@ -373,23 +452,31 @@ namespace rpc
 
         virtual bool send(const BaseMessage::ptr &msg) override
         {
-            if (connected() == false)
+            BaseConnection::ptr conn;
+            {
+                std::unique_lock<std::mutex> lock(_conn_mutex);
+                conn = _conn;
+            }
+
+            if (!conn || conn->connected() == false)
             {
                 ELOG("连接已断开！");
                 return false;
             }
 
-            _conn->send(msg);
+            conn->send(msg);
             return true;
         }
 
         virtual BaseConnection::ptr connection() override
         {
+            std::unique_lock<std::mutex> lock(_conn_mutex);
             return _conn;
         }
 
         virtual bool connected() override
         {
+            std::unique_lock<std::mutex> lock(_conn_mutex);
             return (_conn && _conn->connected());
         }
 
@@ -399,16 +486,32 @@ namespace rpc
             if (conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;
-                _conn = ConnectionFactory::create(conn, _protocol); // 所以：先创建并赋值对象，确保数据就绪
+                // _conn 在网络线程写入，业务线程会读取，这里加锁避免数据竞争
+                {
+                    std::unique_lock<std::mutex> lock(_conn_mutex);
+                    _conn = ConnectionFactory::create(conn, _protocol);
+                }
 
                 // 之前的代码在这里可能发生了线程切换/竞争！
 
-                _downlatch.countDown(); // 这里的操作作为一个“内存屏障”，保证之前的写操作对主线程可见，然后再唤醒主线程
+                if (_downlatch.getCount() > 0)
+                {
+                    _downlatch.countDown(); // 唤醒 connect() 等待
+                }
             }
             else
             {
                 std::cout << "连接断开！" << std::endl;
-                _conn.reset();
+                {
+                    std::unique_lock<std::mutex> lock(_conn_mutex);
+                    _conn.reset();
+                }
+
+                // 连接失败也要唤醒等待线程，避免永久阻塞
+                if (_downlatch.getCount() > 0)
+                {
+                    _downlatch.countDown();
+                }
             }
         }
 
@@ -445,7 +548,19 @@ namespace rpc
                 DLOG("缓冲区数据解析完毕！调用回调函数进行处理！");
                 if (_cb_message)
                 {
-                    _cb_message(_conn, msg);
+                    BaseConnection::ptr conn_snapshot;
+                    {
+                        std::unique_lock<std::mutex> lock(_conn_mutex);
+                        conn_snapshot = _conn;
+                    }
+
+                    if (!conn_snapshot)
+                    {
+                        ELOG("消息处理时连接对象为空！");
+                        return;
+                    }
+
+                    _cb_message(conn_snapshot, msg);
                 }
             }
         }
@@ -457,6 +572,7 @@ namespace rpc
         muduo::CountDownLatch _downlatch;
         BaseProtocol::ptr _protocol;
         BaseConnection::ptr _conn;
+        std::mutex _conn_mutex;
         muduo::net::TcpClient _client; // muduo的tcp客户端
     };
 

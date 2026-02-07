@@ -282,7 +282,9 @@ namespace rpc
                 return false;
             }
 
-            if (_body[KEY_RESULT].isNull() == true)
+            // 仅在成功场景要求 result，错误场景允许无 result（避免误判合法错误响应）
+            if ((RCode)_body[KEY_RCODE].asInt() == RCode::RCODE_OK &&
+                _body[KEY_RESULT].isNull() == true)
             {
                 ELOG("RPC响应中没有调用结果或者返回结果类型错误！");
                 return false;
@@ -334,7 +336,9 @@ namespace rpc
                 return false;
             }
 
+            // 服务发现成功时才必须包含 method + host 列表；失败响应允许只返回错误码
             if (_body[KEY_OPTYPE].asInt() == (int)ServiceOptype::SERVICE_DISCOVERY &&
+                _body[KEY_RCODE].asInt() == (int)RCode::RCODE_OK &&
                 (_body[KEY_METHOD].isNull() == true ||
                 _body[KEY_METHOD].isString() == false ||
                 _body[KEY_HOST].isNull() == true ||
